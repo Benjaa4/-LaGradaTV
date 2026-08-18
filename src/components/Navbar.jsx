@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Trophy, PlayCircle, ShieldCheck, LogOut } from 'lucide-react';
+import { Trophy, PlayCircle, ShieldCheck, LogOut, Award } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import './Navbar.css';
 
@@ -7,33 +7,38 @@ export default function Navbar() {
   const { isAdmin, logout } = useAppContext();
 
   return (
-    <nav className="navbar glass-panel">
+    <nav className="navbar">
       <div className="navbar-container">
         <Link to="/" className="navbar-brand">
           <Trophy size={28} className="brand-icon" />
-          <span>La Grada TV</span>
+          <span className="brand-text">La Grada TV</span>
         </Link>
         
         <div className="navbar-links">
-          <Link to="/" className="nav-link">Torneos</Link>
-          <Link to="/partidos" className="nav-link">
-            <PlayCircle size={18} />
-            Videos & Vivo
+          <Link to="/torneos" className="nav-link">
+            <Award size={18} />
+            Torneos
+          </Link>
+          <Link to="/albumes" className="nav-link">
+            <Folder size={18} />
+            Álbumes
           </Link>
           
           {isAdmin ? (
-            <>
-              <Link to="/admin" className="nav-link admin-link">
-                <ShieldCheck size={18} />
-                Panel Admin
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid var(--border-glass)', paddingLeft: '1rem', marginLeft: '0.5rem' }}>
+              <Link to="/admin" className="nav-icon-btn admin-link" title="Panel Admin">
+                <ShieldCheck size={20} />
               </Link>
-              <button onClick={logout} className="nav-link logout-btn">
-                <LogOut size={18} />
-                Salir
+              <button onClick={logout} className="nav-icon-btn logout-btn" title="Salir">
+                <LogOut size={20} />
               </button>
-            </>
+            </div>
           ) : (
-            <Link to="/login" className="btn btn-primary">Login Admin</Link>
+            <div style={{ display: 'flex', alignItems: 'center', borderLeft: '1px solid var(--border-glass)', paddingLeft: '1rem', marginLeft: '0.5rem' }}>
+              <Link to="/login" className="nav-icon-btn login-link" title="Login Admin">
+                <ShieldCheck size={20} />
+              </Link>
+            </div>
           )}
         </div>
       </div>

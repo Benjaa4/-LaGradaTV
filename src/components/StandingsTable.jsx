@@ -19,6 +19,7 @@ export default function StandingsTable({ standings }) {
             <th>GF</th>
             <th>GC</th>
             <th>DIF</th>
+            <th>FAL</th>
             <th>PTS</th>
           </tr>
         </thead>
@@ -34,6 +35,7 @@ export default function StandingsTable({ standings }) {
               <td>{team.goalsFor}</td>
               <td>{team.goalsAgainst}</td>
               <td>{team.goalsFor - team.goalsAgainst}</td>
+              <td>{team.fouls || 0}</td>
               <td className="points">{team.points}</td>
             </tr>
           ))}

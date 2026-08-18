@@ -1,68 +1,251 @@
 import { createContext, useState, useEffect, useContext } from 'react';
-import { initialTournaments, initialVideos } from '../data/mockData';
 
 const AppContext = createContext();
 
 export const useAppContext = () => useContext(AppContext);
 
+const API_URL = 'http://localhost:3001/api';
+
 export const AppProvider = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [tournaments, setTournaments] = useState(() => {
-    const saved = localStorage.getItem('tournaments');
-    return saved ? JSON.parse(saved) : initialTournaments;
-  });
-  const [videos, setVideos] = useState(() => {
-    const saved = localStorage.getItem('videos');
-    return saved ? JSON.parse(saved) : initialVideos;
-  });
+  const [tournaments, setTournaments] = useState([]);
+  const [videos, setVideos] = useState([]);
+  const [albums, setAlbums] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    localStorage.setItem('tournaments', JSON.stringify(tournaments));
-  }, [tournaments]);
-
-  useEffect(() => {
-    localStorage.setItem('videos', JSON.stringify(videos));
-  }, [videos]);
-
-  const login = (username, password) => {
-    // Simulando login
-    if (username === 'admin' && password === 'admin123') {
-      setIsAdmin(true);
-      return true;
+  // Load data from backend
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [tournamentsRes, videosRes, albumsRes] = await Promise.all([
+        fetch(`${API_URL}/tournaments`),
+        fetch(`${API_URL}/videos`),
+        fetch(`${API_URL}/albums`)
+      ]);
+      
+      const tournamentsData = await tournamentsRes.json();
+      const videosData = await videosRes.json();
+      const albumsData = await albumsRes.json();
+      
+      setTournaments(tournamentsData);
+      setVideos(videosData);
+      setAlbums(albumsData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
     }
-    return false;
+  };
+
+  useEffect(() => {
+    fetchData();
+    // Check if there is a token in localstorage
+    if (localStorage.getItem('adminToken')) {
+      setIsAdmin(true);
+    }
+  }, []);
+
+  const login = async (username, password) => {
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAdmin(true);
+        localStorage.setItem('adminToken', data.token);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
   };
 
   const logout = () => {
     setIsAdmin(false);
+    localStorage.removeItem('adminToken');
   };
 
-  const updateTeamPoints = (tournamentId, teamId, points) => {
-    setTournaments(prev => prev.map(t => {
-      if (t.id === tournamentId) {
-        return {
-          ...t,
-          standings: t.standings.map(s => s.id === teamId ? { ...s, points: parseInt(points) } : s)
-            .sort((a, b) => b.points - a.points)
-        };
+  const updateTeamStats = async (tournamentId, teamId, newStats) => {
+    try {
+      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/standings/${teamId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStats)
+      });
+      if (res.ok) {
+        // Update local state to avoid refetching everything
+        setTournaments(prev => prev.map(t => {
+          if (t.id === tournamentId) {
+            return {
+              ...t,
+              standings: t.standings.map(s => s.id === teamId ? { 
+                ...s, 
+                ...newStats,
+                played: parseInt(newStats.played) || 0,
+                won: parseInt(newStats.won) || 0,
+                drawn: parseInt(newStats.drawn) || 0,
+                lost: parseInt(newStats.lost) || 0,
+                goalsFor: parseInt(newStats.goalsFor) || 0,
+                goalsAgainst: parseInt(newStats.goalsAgainst) || 0,
+                points: parseInt(newStats.points) || 0,
+                fouls: parseInt(newStats.fouls) || 0
+              } : s).sort((a, b) => b.points - a.points)
+            };
+          }
+          return t;
+        }));
       }
-      return t;
-    }));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const addVideo = (video) => {
-    setVideos(prev => [{ ...video, id: 'v' + Date.now() }, ...prev]);
+  const addVideo = async (video) => {
+    try {
+      const res = await fetch(`${API_URL}/videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(video)
+      });
+      if (res.ok) {
+        const newVideo = await res.json();
+        setVideos(prev => [newVideo, ...prev]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const deleteVideo = (id) => {
-    setVideos(prev => prev.filter(v => v.id !== id));
+  const deleteVideo = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/videos/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setVideos(prev => prev.filter(v => v.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const addAlbum = async (album) => {
+    try {
+      const res = await fetch(`${API_URL}/albums`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(album)
+      });
+      if (res.ok) {
+        const newAlbum = await res.json();
+        setAlbums(prev => [newAlbum, ...prev]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteAlbum = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/albums/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setAlbums(prev => prev.filter(a => a.id !== id));
+        // Note: In a real app we might want to update the videos that belonged to this album too
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  const addTournament = async (tournament) => {
+    try {
+      const res = await fetch(`${API_URL}/tournaments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tournament)
+      });
+      if (res.ok) {
+        const newTournament = await res.json();
+        setTournaments(prev => [...prev, newTournament]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const editTournament = async (id, data) => {
+    try {
+      const res = await fetch(`${API_URL}/tournaments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        setTournaments(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteTournament = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/tournaments/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setTournaments(prev => prev.filter(t => t.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const editVideo = async (id, data) => {
+    try {
+      const res = await fetch(`${API_URL}/videos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        const updatedVideo = await res.json();
+        setVideos(prev => prev.map(v => v.id === id ? { ...v, ...updatedVideo } : v));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const editAlbum = async (id, data) => {
+    try {
+      const res = await fetch(`${API_URL}/albums/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        const updatedAlbum = await res.json();
+        setAlbums(prev => prev.map(a => a.id === id ? { ...a, ...updatedAlbum } : a));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
     <AppContext.Provider value={{
       isAdmin, login, logout,
-      tournaments, updateTeamPoints,
-      videos, addVideo, deleteVideo
+      tournaments, addTournament, editTournament, deleteTournament, updateTeamStats,
+      videos, addVideo, editVideo, deleteVideo,
+      albums, addAlbum, editAlbum, deleteAlbum,
+      loading
     }}>
       {children}
     </AppContext.Provider>

@@ -1,6 +1,9 @@
 .table-container {
   overflow-x: auto;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  -webkit-overflow-scrolling: touch;
 }
 
 .standings-table {
@@ -11,23 +14,25 @@
 }
 
 .standings-table th {
-  background: rgba(0, 0, 0, 0.4);
+  background: transparent;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: 1rem;
+  padding: 1.25rem 1rem;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .standings-table td {
   padding: 1rem;
-  border-bottom: 1px solid var(--border-glass);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   color: var(--text-secondary);
+  font-size: 0.95rem;
 }
 
 .standings-table tbody tr {
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .standings-table tbody tr:hover {
@@ -42,19 +47,24 @@
   text-align: left;
   font-weight: 600;
   color: var(--text-primary) !important;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .pos {
   font-weight: 700;
   color: var(--text-muted);
+  width: 20px;
+  display: inline-block;
 }
 
 .top-team .pos {
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .points {
   font-weight: 800;
-  color: var(--primary) !important;
+  color: var(--text-primary) !important;
   font-size: 1.1rem;
 }
