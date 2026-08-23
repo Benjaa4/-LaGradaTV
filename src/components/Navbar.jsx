@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Trophy, PlayCircle, ShieldCheck, LogOut, Award } from 'lucide-react';
+import { Trophy, PlayCircle, ShieldCheck, LogOut, Award, Folder } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import './Navbar.css';
 
