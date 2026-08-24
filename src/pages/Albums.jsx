@@ -61,6 +61,7 @@ export default function Albums() {
                   src={album.thumbnail || 'https://images.unsplash.com/photo-1518605368461-1ee125b29b46?q=80&w=600&auto=format&fit=crop'} 
                   alt={album.title} 
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1518605368461-1ee125b29b46?q=80&w=600&auto=format&fit=crop'; }}
                 />
               </div>
               <div style={{ padding: '1.5rem' }}>

@@ -1,26 +1,25 @@
-const sqlite3 = require('sqlite3').verbose();
+const { createClient } = require('@libsql/client');
 const path = require('path');
+require('dotenv').config();
 
-const dbPath = path.resolve(__dirname, 'database.sqlite');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error connecting to database:', err.message);
-  } else {
-    console.log('Connected to the SQLite database.');
-    initDb();
-  }
+// Se conecta a Turso si se proveen credenciales, si no usa SQLite local
+const url = process.env.TURSO_DATABASE_URL || 'file:database.sqlite';
+
+const db = createClient({
+  url: url,
+  authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-function initDb() {
-  db.serialize(() => {
+async function initDb() {
+  try {
     // Create Tournaments table
-    db.run(`CREATE TABLE IF NOT EXISTS tournaments (
+    await db.execute(`CREATE TABLE IF NOT EXISTS tournaments (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL
     )`);
 
     // Create Standings (Teams) table
-    db.run(`CREATE TABLE IF NOT EXISTS standings (
+    await db.execute(`CREATE TABLE IF NOT EXISTS standings (
       id TEXT PRIMARY KEY,
       tournament_id TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -36,7 +35,7 @@ function initDb() {
     )`);
 
     // Create Albums table
-    db.run(`CREATE TABLE IF NOT EXISTS albums (
+    await db.execute(`CREATE TABLE IF NOT EXISTS albums (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       thumbnail TEXT,
@@ -44,7 +43,7 @@ function initDb() {
     )`);
 
     // Create Videos table
-    db.run(`CREATE TABLE IF NOT EXISTS videos (
+    await db.execute(`CREATE TABLE IF NOT EXISTS videos (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       url TEXT NOT NULL,
@@ -57,12 +56,18 @@ function initDb() {
     )`);
 
     // Add album_id column to existing videos table (ignore error if it already exists)
-    db.run(`ALTER TABLE videos ADD COLUMN album_id TEXT`, (err) => {
+    try {
+      await db.execute(`ALTER TABLE videos ADD COLUMN album_id TEXT`);
+    } catch (e) {
       // Ignoramos el error si la columna ya existe
-    });
+    }
 
     console.log('Database initialized.');
-  });
+  } catch (error) {
+    console.error('Error initializing database:', error);
+  }
 }
+
+initDb();
 
 module.exports = db;
