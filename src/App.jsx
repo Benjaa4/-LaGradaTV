@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Admin from './pages/Admin';
 import VideoView from './pages/VideoView';
 import AlbumView from './pages/AlbumView';
+import MatchView from './pages/MatchView';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/video/:id" element={<VideoView />} />
           <Route path="/album/:id" element={<AlbumView />} />
+          <Route path="/partido/:id" element={<MatchView />} />
         </Routes>
       </main>
     </div>

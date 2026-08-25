@@ -42,6 +42,32 @@ async function initDb() {
       date TEXT
     )`);
 
+    // Create Locations table
+    await db.execute(`CREATE TABLE IF NOT EXISTS locations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      map_url TEXT
+    )`);
+
+    // Create Matches table
+    await db.execute(`CREATE TABLE IF NOT EXISTS matches (
+      id TEXT PRIMARY KEY,
+      tournament_id TEXT NOT NULL,
+      home_team_id TEXT NOT NULL,
+      away_team_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      location_id TEXT,
+      status TEXT DEFAULT 'scheduled',
+      home_score INTEGER DEFAULT 0,
+      away_score INTEGER DEFAULT 0,
+      stream_url TEXT,
+      FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
+      FOREIGN KEY (home_team_id) REFERENCES standings (id),
+      FOREIGN KEY (away_team_id) REFERENCES standings (id),
+      FOREIGN KEY (location_id) REFERENCES locations (id)
+    )`);
+
     // Create Videos table
     await db.execute(`CREATE TABLE IF NOT EXISTS videos (
       id TEXT PRIMARY KEY,

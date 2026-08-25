@@ -1,70 +1,64 @@
 .table-container {
   overflow-x: auto;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
   -webkit-overflow-scrolling: touch;
 }
 
 .standings-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: center;
-  white-space: nowrap;
+  width: 100%; border-collapse: collapse;
+  text-align: center; white-space: nowrap;
+}
+
+.standings-table thead tr {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(99,102,241,0.06) 100%);
+  border-bottom: 1px solid var(--border-glass);
 }
 
 .standings-table th {
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 1.25rem 1rem;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--text-muted); font-size: 0.72rem;
+  font-weight: 700; padding: 1rem 0.85rem;
+  text-transform: uppercase; letter-spacing: 1.5px;
 }
 
 .standings-table td {
-  padding: 1rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  color: var(--text-secondary);
-  font-size: 0.95rem;
+  padding: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--text-secondary); font-size: 0.9rem;
 }
 
 .standings-table tbody tr {
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease;
 }
-
 .standings-table tbody tr:hover {
-  background-color: var(--bg-glass-hover);
+  background: rgba(59,130,246,0.05);
 }
+.standings-table tbody tr:last-child td { border-bottom: none; }
 
-.standings-table tbody tr:last-child td {
-  border-bottom: none;
+/* First place — gold tint */
+.standings-table tbody tr:first-child td {
+  background: linear-gradient(90deg, rgba(245,158,11,0.06) 0%, transparent 80%);
 }
+.standings-table tbody tr:first-child .pos { color: #fbbf24 !important; }
+
+/* Top 3 pos colors */
+.standings-table tbody tr:nth-child(2) .pos { color: #a1a1aa !important; }
+.standings-table tbody tr:nth-child(3) .pos { color: #92400e !important; }
 
 .team-name {
-  text-align: left;
-  font-weight: 600;
+  text-align: left; font-weight: 700;
   color: var(--text-primary) !important;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  display: flex; align-items: center; gap: 0.65rem;
 }
 
 .pos {
-  font-weight: 700;
-  color: var(--text-muted);
-  width: 20px;
-  display: inline-block;
-}
-
-.top-team .pos {
-  color: var(--primary);
+  font-weight: 800; font-size: 0.85rem;
+  color: var(--text-muted); width: 20px;
+  display: inline-block; text-align: center;
 }
 
 .points {
-  font-weight: 800;
+  font-weight: 900 !important;
   color: var(--text-primary) !important;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }

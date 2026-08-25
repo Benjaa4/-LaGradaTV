@@ -11,25 +11,33 @@ export const AppProvider = ({ children }) => {
   const [tournaments, setTournaments] = useState([]);
   const [videos, setVideos] = useState([]);
   const [albums, setAlbums] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Load data from backend
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [tournamentsRes, videosRes, albumsRes] = await Promise.all([
+      const [tournamentsRes, videosRes, albumsRes, locationsRes, matchesRes] = await Promise.all([
         fetch(`${API_URL}/tournaments`),
         fetch(`${API_URL}/videos`),
-        fetch(`${API_URL}/albums`)
+        fetch(`${API_URL}/albums`),
+        fetch(`${API_URL}/locations`),
+        fetch(`${API_URL}/matches`)
       ]);
       
       const tournamentsData = await tournamentsRes.json();
       const videosData = await videosRes.json();
       const albumsData = await albumsRes.json();
+      const locationsData = await locationsRes.json();
+      const matchesData = await matchesRes.json();
       
       setTournaments(tournamentsData);
       setVideos(videosData);
       setAlbums(albumsData);
+      setLocations(locationsData);
+      setMatches(matchesData);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -95,6 +103,30 @@ export const AppProvider = ({ children }) => {
                 points: parseInt(newStats.points) || 0,
                 fouls: parseInt(newStats.fouls) || 0
               } : s).sort((a, b) => b.points - a.points)
+            };
+          }
+          return t;
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const addTeam = async (tournamentId, name) => {
+    try {
+      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/standings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (res.ok) {
+        const newTeam = await res.json();
+        setTournaments(prev => prev.map(t => {
+          if (t.id === tournamentId) {
+            return {
+              ...t,
+              standings: [...t.standings, newTeam]
             };
           }
           return t;
@@ -239,12 +271,102 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addLocation = async (location) => {
+    try {
+      const res = await fetch(`${API_URL}/locations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(location)
+      });
+      if (res.ok) {
+        const newLocation = await res.json();
+        setLocations(prev => [...prev, newLocation].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const editLocation = async (id, data) => {
+    try {
+      const res = await fetch(`${API_URL}/locations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        setLocations(prev => prev.map(l => l.id === id ? { ...l, ...data } : l));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteLocation = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/locations/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setLocations(prev => prev.filter(l => l.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const addMatch = async (match) => {
+    try {
+      const res = await fetch(`${API_URL}/matches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(match)
+      });
+      if (res.ok) {
+        const newMatch = await res.json();
+        setMatches(prev => [newMatch, ...prev].sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`)));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const editMatch = async (id, data) => {
+    try {
+      const res = await fetch(`${API_URL}/matches/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        setMatches(prev => prev.map(m => m.id === id ? { ...m, ...data } : m));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteMatch = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/matches/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setMatches(prev => prev.filter(m => m.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       isAdmin, login, logout,
-      tournaments, addTournament, editTournament, deleteTournament, updateTeamStats,
+      tournaments, addTournament, editTournament, deleteTournament, updateTeamStats, addTeam,
       videos, addVideo, editVideo, deleteVideo,
       albums, addAlbum, editAlbum, deleteAlbum,
+      locations, addLocation, editLocation, deleteLocation,
+      matches, addMatch, editMatch, deleteMatch,
       loading
     }}>
       {children}

@@ -119,6 +119,23 @@ app.put('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => 
   }
 });
 
+// Add a team to a tournament
+app.post('/api/tournaments/:tournamentId/standings', async (req, res) => {
+  const { tournamentId } = req.params;
+  const { name } = req.body;
+  const id = generateId('eq');
+  
+  try {
+    await db.execute({
+      sql: 'INSERT INTO standings (id, tournament_id, name, played, won, drawn, lost, goalsFor, goalsAgainst, points, fouls) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0)',
+      args: [id, tournamentId, name]
+    });
+    res.status(201).json({ id, tournament_id: tournamentId, name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, fouls: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all videos
 app.get('/api/videos', async (req, res) => {
   try {
@@ -224,6 +241,106 @@ app.put('/api/videos/:id', async (req, res) => {
     });
     if (result.rowsAffected === 0) return res.status(404).json({ error: 'Video not found' });
     res.json({ message: 'Video updated', id: req.params.id, title, url, thumbnail, type, album_id: album_id || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Locations ---
+app.get('/api/locations', async (req, res) => {
+  try {
+    const result = await db.execute('SELECT * FROM locations ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/locations', async (req, res) => {
+  const { name, map_url } = req.body;
+  const id = generateId('loc');
+  try {
+    await db.execute({
+      sql: 'INSERT INTO locations (id, name, map_url) VALUES (?, ?, ?)',
+      args: [id, name, map_url || null]
+    });
+    res.status(201).json({ id, name, map_url: map_url || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/locations/:id', async (req, res) => {
+  const { name, map_url } = req.body;
+  try {
+    const result = await db.execute({
+      sql: 'UPDATE locations SET name = ?, map_url = ? WHERE id = ?',
+      args: [name, map_url || null, req.params.id]
+    });
+    if (result.rowsAffected === 0) return res.status(404).json({ error: 'Location not found' });
+    res.json({ message: 'Location updated', id: req.params.id, name, map_url: map_url || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/locations/:id', async (req, res) => {
+  try {
+    await db.execute({
+      sql: 'DELETE FROM locations WHERE id = ?',
+      args: [req.params.id]
+    });
+    res.json({ message: 'Location deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Matches ---
+app.get('/api/matches', async (req, res) => {
+  try {
+    const result = await db.execute('SELECT * FROM matches ORDER BY date DESC, time DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/matches', async (req, res) => {
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url } = req.body;
+  const id = generateId('m');
+  try {
+    await db.execute({
+      sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      args: [id, tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null]
+    });
+    res.status(201).json({ id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/matches/:id', async (req, res) => {
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url } = req.body;
+  try {
+    const result = await db.execute({
+      sql: 'UPDATE matches SET tournament_id = ?, home_team_id = ?, away_team_id = ?, date = ?, time = ?, location_id = ?, status = ?, home_score = ?, away_score = ?, stream_url = ? WHERE id = ?',
+      args: [tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, req.params.id]
+    });
+    if (result.rowsAffected === 0) return res.status(404).json({ error: 'Match not found' });
+    res.json({ message: 'Match updated', id: req.params.id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/matches/:id', async (req, res) => {
+  try {
+    await db.execute({
+      sql: 'DELETE FROM matches WHERE id = ?',
+      args: [req.params.id]
+    });
+    res.json({ message: 'Match deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,119 +1,75 @@
 .tournament-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  background: rgba(9, 9, 11, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex; flex-direction: column;
+  height: 100%; overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.3s ease, background 0.3s ease;
+  transition: transform 0.35s cubic-bezier(0.175,0.885,0.32,1.275),
+              border-color 0.3s, box-shadow 0.3s;
   position: relative;
 }
-
 .tournament-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(16, 185, 129, 0.3);
-  background: rgba(9, 9, 11, 0.7);
-  box-shadow: 0 12px 30px -10px rgba(16, 185, 129, 0.15);
+  transform: translateY(-6px);
+  border-color: rgba(16,185,129,0.4);
+  box-shadow: 0 16px 40px -10px rgba(16,185,129,0.2);
 }
 
 .card-image-container {
-  height: 200px;
-  position: relative;
-  overflow: hidden;
-  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  height: 190px; position: relative; overflow: hidden;
 }
-
 .card-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.65s ease;
 }
-
-.tournament-card:hover .card-image {
-  transform: scale(1.05);
-}
+.tournament-card:hover .card-image { transform: scale(1.07); }
 
 .card-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to bottom, transparent 40%, rgba(9, 9, 11, 0.9));
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(10,10,15,0.92));
 }
 
 .card-content {
-  padding: 0 1.5rem 1.5rem 1.5rem;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  margin-top: -30px;
-  z-index: 2;
+  padding: 0 1.5rem 1.5rem;
+  flex-grow: 1; display: flex; flex-direction: column;
+  margin-top: -24px; z-index: 2; position: relative;
 }
 
 .card-season {
-  font-size: 0.7rem;
-  font-weight: 800;
-  color: var(--primary);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  background: rgba(16, 185, 129, 0.1);
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  width: fit-content;
-  margin-bottom: 0.75rem;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  font-size: 0.68rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  background: rgba(16,185,129,0.12);
+  color: #34d399; border: 1px solid rgba(16,185,129,0.2);
+  padding: 0.2rem 0.75rem; border-radius: var(--radius-full);
+  width: fit-content; margin-bottom: 0.75rem;
 }
 
 .card-title {
-  font-size: 1.3rem;
-  font-weight: 800;
-  margin: 0 0 0.5rem 0;
-  color: var(--text-primary);
-  line-height: 1.2;
+  font-size: 1.25rem; font-weight: 800;
+  margin: 0 0 0.5rem; color: var(--text-primary); line-height: 1.2;
 }
 
 .card-description {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  margin-bottom: 1.5rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.5;
-  flex-grow: 1;
+  color: var(--text-secondary); font-size: 0.88rem;
+  margin-bottom: 1.25rem; line-height: 1.55;
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; flex-grow: 1;
 }
 
 .card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 1rem;
-  margin-top: auto;
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid var(--border-glass); padding-top: 0.85rem; margin-top: auto;
 }
 
 .teams-count {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  font-weight: 500;
+  font-size: 0.82rem; color: var(--text-muted); font-weight: 500;
 }
 
 .view-details {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.85rem; font-weight: 700;
   color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
 }
-
 .tournament-card:hover .view-details {
-  color: var(--primary);
+  color: #34d399;
   transform: translateX(4px);
 }
