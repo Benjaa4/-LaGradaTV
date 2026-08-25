@@ -84,9 +84,25 @@ async function initDb() {
     // Add album_id column to existing videos table (ignore error if it already exists)
     try {
       await db.execute(`ALTER TABLE videos ADD COLUMN album_id TEXT`);
-    } catch (e) {
-      // Ignoramos el error si la columna ya existe
-    }
+    } catch (e) { /* column already exists */ }
+
+    // Add type column to tournaments (league | knockout)
+    try {
+      await db.execute(`ALTER TABLE tournaments ADD COLUMN type TEXT DEFAULT 'league'`);
+    } catch (e) { /* column already exists */ }
+
+    // Add season, description, image columns to tournaments
+    try { await db.execute(`ALTER TABLE tournaments ADD COLUMN season TEXT`); } catch (e) {}
+    try { await db.execute(`ALTER TABLE tournaments ADD COLUMN description TEXT`); } catch (e) {}
+    try { await db.execute(`ALTER TABLE tournaments ADD COLUMN image TEXT`); } catch (e) {}
+
+    // Add round and match_order to matches (for knockout brackets)
+    try {
+      await db.execute(`ALTER TABLE matches ADD COLUMN round TEXT`);
+    } catch (e) { /* column already exists */ }
+    try {
+      await db.execute(`ALTER TABLE matches ADD COLUMN match_order INTEGER DEFAULT 0`);
+    } catch (e) { /* column already exists */ }
 
     console.log('Database initialized.');
   } catch (error) {

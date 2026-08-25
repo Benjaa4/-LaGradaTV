@@ -32,6 +32,7 @@ export default function Admin() {
   const [editAlbumData, setEditAlbumData] = useState({});
 
   const [newTournamentName, setNewTournamentName] = useState('');
+  const [newTournamentType, setNewTournamentType] = useState('league');
   const [editingTournamentId, setEditingTournamentId] = useState(null);
   const [editTournamentData, setEditTournamentData] = useState({});
 
@@ -39,7 +40,7 @@ export default function Admin() {
   const [editingLocationId, setEditingLocationId] = useState(null);
   const [editLocationData, setEditLocationData] = useState({});
 
-  const [newMatch, setNewMatch] = useState({ tournament_id: '', home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '' });
+  const [newMatch, setNewMatch] = useState({ tournament_id: '', home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '', round: '', match_order: 0 });
   const [editingMatchId, setEditingMatchId] = useState(null);
   const [editMatchData, setEditMatchData] = useState({});
 
@@ -103,8 +104,9 @@ export default function Admin() {
   const handleAddTournament = (e) => {
     e.preventDefault();
     if (newTournamentName) {
-      addTournament({ name: newTournamentName });
+      addTournament({ name: newTournamentName, type: newTournamentType });
       setNewTournamentName('');
+      setNewTournamentType('league');
     }
   };
   const handleEditTournament = (tournament) => {
@@ -130,7 +132,7 @@ export default function Admin() {
     e.preventDefault();
     if (newMatch.tournament_id && newMatch.home_team_id && newMatch.away_team_id) {
       addMatch(newMatch);
-      setNewMatch({ tournament_id: selectedTournament || '', home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '' });
+      setNewMatch({ tournament_id: selectedTournament || '', home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '', round: '', match_order: 0 });
     }
   };
 
@@ -185,6 +187,28 @@ export default function Admin() {
                 <label className="form-label">Nombre del Torneo</label>
                 <input required type="text" className="form-input" value={newTournamentName} onChange={e => setNewTournamentName(e.target.value)} placeholder="Ej: Torneo Apertura 2024" />
               </div>
+              <div className="form-group">
+                <label className="form-label">Tipo de Torneo</label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button type="button"
+                    className={`btn ${newTournamentType === 'league' ? 'btn-primary' : 'btn-glass'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setNewTournamentType('league')}
+                  >
+                    <Trophy size={16} /> Liga
+                  </button>
+                  <button type="button"
+                    className={`btn ${newTournamentType === 'knockout' ? 'btn-primary' : 'btn-glass'}`}
+                    style={{ flex: 1, background: newTournamentType === 'knockout' ? 'linear-gradient(135deg,#ef4444,#b91c1c)' : '' }}
+                    onClick={() => setNewTournamentType('knockout')}
+                  >
+                    ⚔️ Eliminatoria
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                  {newTournamentType === 'league' ? 'Liga: tabla de posiciones con puntos.' : 'Eliminatoria: bracket con octavos, cuartos, semis y final.'}
+                </p>
+              </div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
                 <Plus size={18} /> Crear Torneo
               </button>
@@ -204,7 +228,12 @@ export default function Admin() {
                     </>
                   ) : (
                     <>
-                      <span style={{ flex: 1, fontWeight: '600' }}>{tournament.name}</span>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontWeight: '600', display: 'block' }}>{tournament.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: tournament.type === 'knockout' ? '#f87171' : '#34d399', fontWeight: '600' }}>
+                          {tournament.type === 'knockout' ? '⚔️ Eliminatoria' : '🏆 Liga'}
+                        </span>
+                      </div>
                       <button className="btn btn-glass" onClick={() => handleEditTournament(tournament)}><Edit2 size={16} /></button>
                       <button className="btn btn-danger" onClick={() => deleteTournament(tournament.id)}><Trash2 size={16} /></button>
                     </>
@@ -483,6 +512,26 @@ export default function Admin() {
                       <option value="">-- Seleccionar --</option>
                       {tournaments.find(t => t.id === newMatch.tournament_id)?.standings.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Round selector – only for knockout tournaments */}
+              {tournaments.find(t => t.id === newMatch.tournament_id)?.type === 'knockout' && (
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: 2, minWidth: '200px' }}>
+                    <label className="form-label">⚔️ Ronda del Bracket</label>
+                    <select required className="form-input" style={{ background: 'var(--bg-dark)' }} value={newMatch.round} onChange={e => setNewMatch({...newMatch, round: e.target.value})}>
+                      <option value="">-- Seleccionar Ronda --</option>
+                      <option value="round_of_16">Octavos de Final</option>
+                      <option value="quarterfinal">Cuartos de Final</option>
+                      <option value="semifinal">Semifinal</option>
+                      <option value="final">Final</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">N° en la ronda</label>
+                    <input type="number" min="0" className="form-input" value={newMatch.match_order} onChange={e => setNewMatch({...newMatch, match_order: parseInt(e.target.value) || 0})} placeholder="0" />
                   </div>
                 </div>
               )}
