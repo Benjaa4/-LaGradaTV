@@ -174,7 +174,7 @@ export default function Admin() {
   const [editingLocationId, setEditingLocationId] = useState(null);
   const [editLocationData, setEditLocationData] = useState({});
 
-  const [newMatch, setNewMatch] = useState({ home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '', round: '', match_order: 0 });
+  const [newMatch, setNewMatch] = useState({ home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '', round: '', match_order: 0, description: '' });
   const [editingMatchId, setEditingMatchId] = useState(null);
   const [editMatchData, setEditMatchData] = useState({});
 
@@ -243,7 +243,7 @@ export default function Admin() {
     e.preventDefault();
     if (viewingTournamentId && newMatch.home_team_id && newMatch.away_team_id) {
       addMatch({ ...newMatch, tournament_id: viewingTournamentId });
-      setNewMatch({ home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '', round: '', match_order: 0 });
+      setNewMatch({ home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '', round: '', match_order: 0, description: '' });
       setOpenModal(null);
     }
   };
@@ -493,8 +493,21 @@ export default function Admin() {
                 {tournamentSubTab === 'matches' && (
                   <div className="animate-fade-in">
                     <SectionHeader title="Partidos del Torneo" count={matches.filter(m => m.tournament_id === viewingTournamentId).length} addLabel="Programar Partido" onAdd={() => setOpenModal('match')} />
+                    
+                    {currentTournament?.type === 'knockout' && matches.filter(m => m.tournament_id === viewingTournamentId).length === 0 && (
+                      <div style={{ background: 'rgba(59,130,246,0.1)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px dashed rgba(59,130,246,0.3)', textAlign: 'center', marginBottom: '1.5rem' }}>
+                        <h4 style={{ margin: '0 0 0.5rem', color: 'var(--primary)' }}>Fase Eliminatoria Vacía</h4>
+                        <p style={{ margin: '0 0 1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Puedes generar automáticamente la llave vacía de 16 equipos (Octavos, Cuartos, Semis, Final) para ir llenándola después.</p>
+                        <button className="btn btn-primary" onClick={async () => {
+                          const success = await generateBracket(viewingTournamentId);
+                          if (success) alert('¡Llaves generadas correctamente!');
+                        }}>Generar Llaves de Eliminatoria</button>
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       {matches.filter(m => m.tournament_id === viewingTournamentId).map(match => {
+                        // For empty knockout slots, team might not exist yet
                         const homeTeam = currentTournament.standings.find(s => s.id === match.home_team_id);
                         const awayTeam = currentTournament.standings.find(s => s.id === match.away_team_id);
                         const isEditing = editingMatchId === match.id;
@@ -565,6 +578,11 @@ export default function Admin() {
                                 <div className="form-group" style={{ margin: 0 }}>
                                   <label className="form-label" style={{ fontSize: '0.72rem' }}>URL Video/Stream (Opcional)</label>
                                   <input type="url" className="form-input" placeholder="https://..." value={editMatchData.stream_url || ''} onChange={e => setEditMatchData({ ...editMatchData, stream_url: e.target.value })} />
+                                </div>
+                                
+                                <div className="form-group" style={{ margin: 0 }}>
+                                  <label className="form-label" style={{ fontSize: '0.72rem' }}>Descripción / Resumen (Opcional)</label>
+                                  <textarea className="form-input" placeholder="Escribe aquí los detalles del partido..." value={editMatchData.description || ''} onChange={e => setEditMatchData({ ...editMatchData, description: e.target.value })} rows={3} style={{ resize: 'vertical' }} />
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -975,6 +993,12 @@ export default function Admin() {
                 placeholder="Sin cancha asignada"
               />
             </div>
+            
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Descripción / Resumen (Opcional)</label>
+              <textarea className="form-input" placeholder="Escribe aquí los detalles del partido..." value={newMatch.description || ''} onChange={e => setNewMatch({ ...newMatch, description: e.target.value })} rows={3} style={{ resize: 'vertical' }} />
+            </div>
+
             <button type="submit" className="btn btn-primary">
               <Plus size={17} /> Programar Partido
             </button>

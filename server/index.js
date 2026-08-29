@@ -346,32 +346,71 @@ app.get('/api/matches', async (req, res) => {
 });
 
 app.post('/api/matches', async (req, res) => {
-  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties } = req.body;
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description } = req.body;
   const id = generateId('m');
   try {
     await db.execute({
-      sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      args: [id, tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null]
+      sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      args: [id, tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, description || null]
     });
-    res.status(201).json({ id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null });
+    res.status(201).json({ id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null, description: description || null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.put('/api/matches/:id', async (req, res) => {
-  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties } = req.body;
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description } = req.body;
   try {
     const result = await db.execute({
-      sql: 'UPDATE matches SET tournament_id = ?, home_team_id = ?, away_team_id = ?, date = ?, time = ?, location_id = ?, status = ?, home_score = ?, away_score = ?, stream_url = ?, round = ?, match_order = ?, home_penalties = ?, away_penalties = ? WHERE id = ?',
-      args: [tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, req.params.id]
+      sql: 'UPDATE matches SET tournament_id = ?, home_team_id = ?, away_team_id = ?, date = ?, time = ?, location_id = ?, status = ?, home_score = ?, away_score = ?, stream_url = ?, round = ?, match_order = ?, home_penalties = ?, away_penalties = ?, description = ? WHERE id = ?',
+      args: [tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, description || null, req.params.id]
     });
     if (result.rowsAffected === 0) return res.status(404).json({ error: 'Match not found' });
-    res.json({ message: 'Match updated', id: req.params.id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null });
+    res.json({ message: 'Match updated', id: req.params.id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null, description: description || null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Generate all empty bracket matches for a knockout tournament
+// Structure: 8 matches in round_of_16, 4 in quarterfinal, 2 in semifinal, 1 in final = 15 matches total
+app.post('/api/tournaments/:id/generate-bracket', async (req, res) => {
+  const { id: tournamentId } = req.params;
+  try {
+    // Check if matches already exist for this tournament
+    const existing = await db.execute({ sql: 'SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?', args: [tournamentId] });
+    if (existing.rows[0].count > 0) {
+      return res.status(400).json({ error: 'Este torneo ya tiene partidos generados.' });
+    }
+
+    const rounds = [
+      { key: 'round_of_16',  count: 8 },
+      { key: 'quarterfinal', count: 4 },
+      { key: 'semifinal',    count: 2 },
+      { key: 'final',        count: 1 },
+    ];
+
+    const PLACEHOLDER = 'tbd'; // "to be defined" placeholder team ID
+    const created = [];
+
+    for (const round of rounds) {
+      for (let i = 0; i < round.count; i++) {
+        const matchId = generateId('m');
+        await db.execute({
+          sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, status, home_score, away_score, round, match_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          args: [matchId, tournamentId, PLACEHOLDER, PLACEHOLDER, 'TBD', '00:00', 'scheduled', 0, 0, round.key, i]
+        });
+        created.push({ id: matchId, round: round.key, match_order: i, home_team_id: PLACEHOLDER, away_team_id: PLACEHOLDER, tournament_id: tournamentId, date: 'TBD', time: '00:00', status: 'scheduled', home_score: 0, away_score: 0, home_penalties: null, away_penalties: null, description: null, stream_url: null, location_id: null });
+      }
+    }
+
+    res.status(201).json({ message: 'Bracket generated', matches: created });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 app.delete('/api/matches/:id', async (req, res) => {
   try {

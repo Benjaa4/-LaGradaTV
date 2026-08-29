@@ -153,6 +153,8 @@ export const AppProvider = ({ children }) => {
           }
           return t;
         }));
+        // Remove matches associated with this team
+        setMatches(prev => prev.filter(m => m.home_team_id !== teamId && m.away_team_id !== teamId));
       } else {
         const err = await res.json();
         alert('Error al eliminar equipo: ' + err.error);
@@ -214,7 +216,7 @@ export const AppProvider = ({ children }) => {
       });
       if (res.ok) {
         setAlbums(prev => prev.filter(a => a.id !== id));
-        // Note: In a real app we might want to update the videos that belonged to this album too
+        setVideos(prev => prev.filter(v => v.album_id !== id));
       }
     } catch (e) {
       console.error(e);
@@ -258,6 +260,7 @@ export const AppProvider = ({ children }) => {
       });
       if (res.ok) {
         setTournaments(prev => prev.filter(t => t.id !== id));
+        setMatches(prev => prev.filter(m => m.tournament_id !== id));
       }
     } catch (e) {
       console.error(e);
@@ -365,6 +368,46 @@ export const AppProvider = ({ children }) => {
       });
       if (res.ok) {
         setMatches(prev => prev.map(m => m.id === id ? { ...m, ...data } : m));
+        
+        // --- Auto Progression Logic ---
+        if (data.status === 'played' && data.round && data.round !== 'final') {
+          // Determine winner
+          let winnerId = null;
+          if (data.home_score > data.away_score) winnerId = data.home_team_id;
+          else if (data.away_score > data.home_score) winnerId = data.away_team_id;
+          else {
+            const hp = parseInt(data.home_penalties) || 0;
+            const ap = parseInt(data.away_penalties) || 0;
+            if (hp > ap) winnerId = data.home_team_id;
+            else if (ap > hp) winnerId = data.away_team_id;
+          }
+
+          if (winnerId) {
+            const nextRoundMap = { 'round_of_16': 'quarterfinal', 'quarterfinal': 'semifinal', 'semifinal': 'final' };
+            const nextRound = nextRoundMap[data.round];
+            const nextOrder = Math.floor((data.match_order || 0) / 2);
+            const isHomeSlot = (data.match_order || 0) % 2 === 0;
+
+            const nextMatch = matches.find(m => m.tournament_id === data.tournament_id && m.round === nextRound && m.match_order === nextOrder);
+            if (nextMatch) {
+              const updatedNextData = { ...nextMatch };
+              if (isHomeSlot) updatedNextData.home_team_id = winnerId;
+              else updatedNextData.away_team_id = winnerId;
+
+              // Fire & forget the update for the next match
+              fetch(`${API_URL}/matches/${nextMatch.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedNextData)
+              }).then(r => {
+                if (r.ok) {
+                  setMatches(prev => prev.map(m => m.id === nextMatch.id ? updatedNextData : m));
+                }
+              });
+            }
+          }
+        }
+        // ------------------------------
       }
     } catch (e) {
       console.error(e);
@@ -384,6 +427,24 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const generateBracket = async (tournamentId) => {
+    try {
+      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/generate-bracket`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setMatches(prev => [...data.matches, ...prev]);
+        return true;
+      } else {
+        const err = await res.json();
+        alert(err.error);
+        return false;
+      }
+    } catch(e) {
+      console.error(e);
+      return false;
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       isAdmin, login, logout,
@@ -391,7 +452,7 @@ export const AppProvider = ({ children }) => {
       videos, addVideo, editVideo, deleteVideo,
       albums, addAlbum, editAlbum, deleteAlbum,
       locations, addLocation, editLocation, deleteLocation,
-      matches, addMatch, editMatch, deleteMatch,
+      matches, addMatch, editMatch, deleteMatch, generateBracket,
       loading
     }}>
       {children}

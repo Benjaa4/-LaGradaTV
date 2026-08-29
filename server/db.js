@@ -117,6 +117,11 @@ async function initDb() {
       await db.execute(`ALTER TABLE matches ADD COLUMN away_penalties INTEGER DEFAULT NULL`);
     } catch (e) { /* column already exists */ }
 
+    // Add description to matches
+    try {
+      await db.execute(`ALTER TABLE matches ADD COLUMN description TEXT`);
+    } catch (e) { /* column already exists */ }
+
 
     console.log('Database initialized.');
   } catch (error) {
