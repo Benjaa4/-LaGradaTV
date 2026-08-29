@@ -371,11 +371,21 @@ export const AppProvider = ({ children }) => {
         
         // --- Auto Progression Logic ---
         if (data.status === 'played' && data.round && data.round !== 'final') {
-          // Determine winner
+          // Determine winner (check disqualification first)
           let winnerId = null;
-          if (data.home_score > data.away_score) winnerId = data.home_team_id;
-          else if (data.away_score > data.home_score) winnerId = data.away_team_id;
-          else {
+          const tournament = tournaments.find(t => t.id === data.tournament_id);
+          const homeTeam = tournament?.standings?.find(s => s.id === data.home_team_id);
+          const awayTeam  = tournament?.standings?.find(s => s.id === data.away_team_id);
+
+          if (homeTeam?.disqualified && !awayTeam?.disqualified) {
+            winnerId = data.away_team_id;
+          } else if (awayTeam?.disqualified && !homeTeam?.disqualified) {
+            winnerId = data.home_team_id;
+          } else if (data.home_score > data.away_score) {
+            winnerId = data.home_team_id;
+          } else if (data.away_score > data.home_score) {
+            winnerId = data.away_team_id;
+          } else {
             const hp = parseInt(data.home_penalties) || 0;
             const ap = parseInt(data.away_penalties) || 0;
             if (hp > ap) winnerId = data.home_team_id;
