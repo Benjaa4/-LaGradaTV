@@ -242,7 +242,19 @@ export default function Admin() {
   const handleAddMatch = (e) => {
     e.preventDefault();
     if (viewingTournamentId && newMatch.home_team_id && newMatch.away_team_id) {
-      addMatch({ ...newMatch, tournament_id: viewingTournamentId });
+      // Auto-assign match_order: next available slot for this round/tournament
+      let matchOrder = newMatch.match_order;
+      if (currentTournament?.type === 'knockout' && newMatch.round) {
+        const existingOrders = matches
+          .filter(m => m.tournament_id === viewingTournamentId && m.round === newMatch.round)
+          .map(m => m.match_order ?? 0);
+        if (existingOrders.length > 0) {
+          matchOrder = Math.max(...existingOrders) + 1;
+        } else {
+          matchOrder = 0;
+        }
+      }
+      addMatch({ ...newMatch, match_order: matchOrder, tournament_id: viewingTournamentId });
       setNewMatch({ home_team_id: '', away_team_id: '', date: new Date().toISOString().split('T')[0], time: '12:00', location_id: '', stream_url: '', round: '', match_order: 0, description: '' });
       setOpenModal(null);
     }
@@ -585,6 +597,13 @@ export default function Admin() {
                                   <textarea className="form-input" placeholder="Escribe aquí los detalles del partido..." value={editMatchData.description || ''} onChange={e => setEditMatchData({ ...editMatchData, description: e.target.value })} rows={3} style={{ resize: 'vertical' }} />
                                 </div>
 
+                                {currentTournament?.type === 'knockout' && (
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label className="form-label" style={{ fontSize: '0.72rem' }}>N° en ronda (match_order) — afecta el orden visual del bracket</label>
+                                    <input type="number" min="0" className="form-input" value={editMatchData.match_order ?? 0} onChange={e => setEditMatchData({ ...editMatchData, match_order: parseInt(e.target.value) || 0 })} />
+                                  </div>
+                                )}
+
                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                                   <button className="btn btn-glass" style={{ flex: 1 }} onClick={() => setEditingMatchId(null)}><X size={16} /> Cancelar</button>
                                   <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => handleSaveMatch(match)}><Check size={16} /> Guardar</button>
@@ -598,6 +617,7 @@ export default function Admin() {
                                       {match.status === 'played' ? 'Finalizado' : 'Programado'}
                                     </span>
                                     {match.round && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{match.round}</span>}
+                                    {match.round && <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--primary)' }}>#{match.match_order ?? 0}</span>}
                                   </div>
                                   <div style={{ display: 'flex', gap: '0.35rem' }}>
                                     <button className="btn btn-glass" style={{ padding: '0.4rem' }} onClick={() => { setEditingMatchId(match.id); setEditMatchData({ ...match }); }}><Edit2 size={14} /></button>
