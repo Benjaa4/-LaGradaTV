@@ -27,7 +27,9 @@ export default function StandingsTable({ standings }) {
           {standings.map((team, index) => (
             <tr key={team.id} className={index < 3 ? 'top-team' : ''}>
               <td className="pos">{index + 1}</td>
-              <td className="team-name">{team.name}</td>
+              <td className="team-name" style={{ textDecoration: team.disqualified ? 'line-through' : 'none', color: team.disqualified ? '#ef4444' : 'inherit' }}>
+                {team.name} {team.disqualified && <span style={{ fontSize: '0.6rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '4px', marginLeft: '0.5rem', textDecoration: 'none', display: 'inline-block' }}>DESC</span>}
+              </td>
               <td>{team.played}</td>
               <td>{team.won}</td>
               <td>{team.drawn}</td>

@@ -47,13 +47,22 @@ export default function MatchCard({ match }) {
         {/* Home */}
         <div className="mc-team">
           <TeamAvatar name={homeTeam.name} />
-          <span className="mc-team-name">{homeTeam.name}</span>
+          <span className="mc-team-name" style={{ textDecoration: homeTeam.disqualified ? 'line-through' : 'none', color: homeTeam.disqualified ? '#ef4444' : 'inherit' }}>
+            {homeTeam.name}
+          </span>
         </div>
 
         {/* Score / VS */}
         <div className="mc-score-block">
           {isPlayed ? (
-            <div className="mc-score">{match.home_score} <span className="mc-score-dash">-</span> {match.away_score}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div className="mc-score">{match.home_score} <span className="mc-score-dash">-</span> {match.away_score}</div>
+              {(match.home_penalties != null && match.away_penalties != null) && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--blue)', fontWeight: 'bold', marginTop: '0.1rem' }}>
+                  ({match.home_penalties} - {match.away_penalties} p.)
+                </div>
+              )}
+            </div>
           ) : (
             <div className="mc-vs">VS</div>
           )}
@@ -62,7 +71,9 @@ export default function MatchCard({ match }) {
         {/* Away */}
         <div className="mc-team mc-team-away">
           <TeamAvatar name={awayTeam.name} />
-          <span className="mc-team-name">{awayTeam.name}</span>
+          <span className="mc-team-name" style={{ textDecoration: awayTeam.disqualified ? 'line-through' : 'none', color: awayTeam.disqualified ? '#ef4444' : 'inherit' }}>
+            {awayTeam.name}
+          </span>
         </div>
       </div>
 

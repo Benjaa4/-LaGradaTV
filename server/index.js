@@ -92,7 +92,7 @@ app.put('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => 
   
   const query = `
     UPDATE standings 
-    SET played = ?, won = ?, drawn = ?, lost = ?, goalsFor = ?, goalsAgainst = ?, points = ?, fouls = ?, name = ?
+    SET played = ?, won = ?, drawn = ?, lost = ?, goalsFor = ?, goalsAgainst = ?, points = ?, fouls = ?, name = ?, disqualified = ?
     WHERE id = ? AND tournament_id = ?
   `;
   
@@ -106,6 +106,7 @@ app.put('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => 
     stats.points || 0,
     stats.fouls || 0,
     stats.name,
+    stats.disqualified ? 1 : 0,
     teamId,
     tournamentId
   ];
@@ -127,10 +128,26 @@ app.post('/api/tournaments/:tournamentId/standings', async (req, res) => {
   
   try {
     await db.execute({
-      sql: 'INSERT INTO standings (id, tournament_id, name, played, won, drawn, lost, goalsFor, goalsAgainst, points, fouls) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0)',
+      sql: 'INSERT INTO standings (id, tournament_id, name, played, won, drawn, lost, goalsFor, goalsAgainst, points, fouls, disqualified) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0)',
       args: [id, tournamentId, name]
     });
-    res.status(201).json({ id, tournament_id: tournamentId, name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, fouls: 0 });
+    res.status(201).json({ id, tournament_id: tournamentId, name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, fouls: 0, disqualified: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a team from a tournament
+app.delete('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => {
+  const { tournamentId, teamId } = req.params;
+  
+  try {
+    const result = await db.execute({
+      sql: 'DELETE FROM standings WHERE id = ? AND tournament_id = ?',
+      args: [teamId, tournamentId]
+    });
+    if (result.rowsAffected === 0) return res.status(404).json({ error: 'Team not found' });
+    res.json({ message: 'Team deleted successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -307,28 +324,28 @@ app.get('/api/matches', async (req, res) => {
 });
 
 app.post('/api/matches', async (req, res) => {
-  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order } = req.body;
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties } = req.body;
   const id = generateId('m');
   try {
     await db.execute({
-      sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      args: [id, tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0]
+      sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      args: [id, tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null]
     });
-    res.status(201).json({ id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0 });
+    res.status(201).json({ id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.put('/api/matches/:id', async (req, res) => {
-  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order } = req.body;
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties } = req.body;
   try {
     const result = await db.execute({
-      sql: 'UPDATE matches SET tournament_id = ?, home_team_id = ?, away_team_id = ?, date = ?, time = ?, location_id = ?, status = ?, home_score = ?, away_score = ?, stream_url = ?, round = ?, match_order = ? WHERE id = ?',
-      args: [tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, req.params.id]
+      sql: 'UPDATE matches SET tournament_id = ?, home_team_id = ?, away_team_id = ?, date = ?, time = ?, location_id = ?, status = ?, home_score = ?, away_score = ?, stream_url = ?, round = ?, match_order = ?, home_penalties = ?, away_penalties = ? WHERE id = ?',
+      args: [tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, req.params.id]
     });
     if (result.rowsAffected === 0) return res.status(404).json({ error: 'Match not found' });
-    res.json({ message: 'Match updated', id: req.params.id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0 });
+    res.json({ message: 'Match updated', id: req.params.id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

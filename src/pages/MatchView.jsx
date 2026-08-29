@@ -40,13 +40,22 @@ export default function MatchView() {
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-darker)', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-glass)', fontSize: '2rem', fontWeight: 'bold' }}>
               {homeTeam?.name.substring(0, 1)}
             </div>
-            <span style={{ fontWeight: '700', fontSize: '1.25rem' }}>{homeTeam?.name}</span>
+            <span style={{ fontWeight: '700', fontSize: '1.25rem', textDecoration: homeTeam?.disqualified ? 'line-through' : 'none', color: homeTeam?.disqualified ? '#ef4444' : 'inherit' }}>
+              {homeTeam?.name}
+            </span>
           </div>
 
           <div style={{ padding: '0 2rem', textAlign: 'center', minWidth: '120px' }}>
             {match.status === 'played' ? (
-              <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'Outfit, sans-serif', letterSpacing: '2px', color: 'var(--text-primary)' }}>
-                {match.home_score} - {match.away_score}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'Outfit, sans-serif', letterSpacing: '2px', color: 'var(--text-primary)', lineHeight: 1 }}>
+                  {match.home_score} - {match.away_score}
+                </div>
+                {(match.home_penalties != null && match.away_penalties != null) && (
+                  <div style={{ fontSize: '1.2rem', color: 'var(--blue)', fontWeight: 'bold', marginTop: '0.5rem' }}>
+                    ({match.home_penalties} - {match.away_penalties} p.)
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>VS</div>
@@ -60,7 +69,9 @@ export default function MatchView() {
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-darker)', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-glass)', fontSize: '2rem', fontWeight: 'bold' }}>
               {awayTeam?.name.substring(0, 1)}
             </div>
-            <span style={{ fontWeight: '700', fontSize: '1.25rem' }}>{awayTeam?.name}</span>
+            <span style={{ fontWeight: '700', fontSize: '1.25rem', textDecoration: awayTeam?.disqualified ? 'line-through' : 'none', color: awayTeam?.disqualified ? '#ef4444' : 'inherit' }}>
+              {awayTeam?.name}
+            </span>
           </div>
         </div>
 

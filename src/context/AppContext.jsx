@@ -101,7 +101,8 @@ export const AppProvider = ({ children }) => {
                 goalsFor: parseInt(newStats.goalsFor) || 0,
                 goalsAgainst: parseInt(newStats.goalsAgainst) || 0,
                 points: parseInt(newStats.points) || 0,
-                fouls: parseInt(newStats.fouls) || 0
+                fouls: parseInt(newStats.fouls) || 0,
+                disqualified: !!newStats.disqualified
               } : s).sort((a, b) => b.points - a.points)
             };
           }
@@ -127,6 +128,27 @@ export const AppProvider = ({ children }) => {
             return {
               ...t,
               standings: [...t.standings, newTeam]
+            };
+          }
+          return t;
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteTeam = async (tournamentId, teamId) => {
+    try {
+      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/standings/${teamId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setTournaments(prev => prev.map(t => {
+          if (t.id === tournamentId) {
+            return {
+              ...t,
+              standings: t.standings.filter(s => s.id !== teamId)
             };
           }
           return t;
@@ -362,7 +384,7 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       isAdmin, login, logout,
-      tournaments, addTournament, editTournament, deleteTournament, updateTeamStats, addTeam,
+      tournaments, addTournament, editTournament, deleteTournament, updateTeamStats, addTeam, deleteTeam,
       videos, addVideo, editVideo, deleteVideo,
       albums, addAlbum, editAlbum, deleteAlbum,
       locations, addLocation, editLocation, deleteLocation,

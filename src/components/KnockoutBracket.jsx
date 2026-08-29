@@ -10,18 +10,31 @@ const ROUNDS = [
 ];
 
 // ── Helper: who won the match ─────────────────────────────────────────────────
-function getWinnerId(match) {
-  if (match.status !== 'played') return null;
+function getWinnerId(match, teams) {
+  if (!match || match.status !== 'played') return null;
+  
+  const homeTeam = teams?.find(t => t.id === match.home_team_id);
+  const awayTeam = teams?.find(t => t.id === match.away_team_id);
+  
+  if (homeTeam?.disqualified && !awayTeam?.disqualified) return match.away_team_id;
+  if (awayTeam?.disqualified && !homeTeam?.disqualified) return match.home_team_id;
+
   if (match.home_score > match.away_score) return match.home_team_id;
   if (match.away_score > match.home_score) return match.away_team_id;
-  return null; // draw — shouldn't happen in knockout but just in case
+  
+  const hp = match.home_penalties || 0;
+  const ap = match.away_penalties || 0;
+  if (hp > ap) return match.home_team_id;
+  if (ap > hp) return match.away_team_id;
+
+  return null;
 }
 
 // ── Match card inside bracket ─────────────────────────────────────────────────
 function BracketMatch({ match, teams, isFinal }) {
   const homeTeam = teams.find(t => t.id === match?.home_team_id);
   const awayTeam = teams.find(t => t.id === match?.away_team_id);
-  const winnerId = match ? getWinnerId(match) : null;
+  const winnerId = match ? getWinnerId(match, teams) : null;
 
   // Empty slot (placeholder for upcoming bracket slots)
   if (!match) {
@@ -41,10 +54,13 @@ function BracketMatch({ match, teams, isFinal }) {
       {/* Home team */}
       <div className={`bm-team ${winnerId === match.home_team_id ? 'bm-team-winner' : ''} ${winnerId && winnerId !== match.home_team_id ? 'bm-team-loser' : ''}`}>
         <div className="bm-avatar">{homeTeam ? homeTeam.name.substring(0, 2).toUpperCase() : '?'}</div>
-        <span className="bm-team-name">{homeTeam?.name ?? 'Por definir'}</span>
+        <span className="bm-team-name" style={{ textDecoration: homeTeam?.disqualified ? 'line-through' : 'none', color: homeTeam?.disqualified ? '#ef4444' : 'inherit' }}>
+          {homeTeam?.name ?? 'Por definir'}
+        </span>
         {match.status === 'played' && (
           <span className={`bm-score ${winnerId === match.home_team_id ? 'bm-score-winner' : ''}`}>
             {match.home_score}
+            {(match.home_penalties != null && match.away_penalties != null) && <span style={{ fontSize: '0.65rem', color: 'var(--blue)', marginLeft: '0.2rem' }}>({match.home_penalties})</span>}
           </span>
         )}
         {winnerId === match.home_team_id && <span className="bm-winner-badge">✓</span>}
@@ -55,10 +71,13 @@ function BracketMatch({ match, teams, isFinal }) {
       {/* Away team */}
       <div className={`bm-team ${winnerId === match.away_team_id ? 'bm-team-winner' : ''} ${winnerId && winnerId !== match.away_team_id ? 'bm-team-loser' : ''}`}>
         <div className="bm-avatar">{awayTeam ? awayTeam.name.substring(0, 2).toUpperCase() : '?'}</div>
-        <span className="bm-team-name">{awayTeam?.name ?? 'Por definir'}</span>
+        <span className="bm-team-name" style={{ textDecoration: awayTeam?.disqualified ? 'line-through' : 'none', color: awayTeam?.disqualified ? '#ef4444' : 'inherit' }}>
+          {awayTeam?.name ?? 'Por definir'}
+        </span>
         {match.status === 'played' && (
           <span className={`bm-score ${winnerId === match.away_team_id ? 'bm-score-winner' : ''}`}>
             {match.away_score}
+            {(match.home_penalties != null && match.away_penalties != null) && <span style={{ fontSize: '0.65rem', color: 'var(--blue)', marginLeft: '0.2rem' }}>({match.away_penalties})</span>}
           </span>
         )}
         {winnerId === match.away_team_id && <span className="bm-winner-badge">✓</span>}
@@ -112,7 +131,7 @@ export default function KnockoutBracket({ matches, teams }) {
 
   // Identify champion
   const finalMatch = matches.find(m => m.round === 'final');
-  const championId = finalMatch ? getWinnerId(finalMatch) : null;
+  const championId = finalMatch ? getWinnerId(finalMatch, teams) : null;
   const champion = championId ? teams.find(t => t.id === championId) : null;
 
   return (

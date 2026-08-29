@@ -104,6 +104,20 @@ async function initDb() {
       await db.execute(`ALTER TABLE matches ADD COLUMN match_order INTEGER DEFAULT 0`);
     } catch (e) { /* column already exists */ }
 
+    // Add disqualified to standings
+    try {
+      await db.execute(`ALTER TABLE standings ADD COLUMN disqualified BOOLEAN DEFAULT 0`);
+    } catch (e) { /* column already exists */ }
+
+    // Add penalties to matches
+    try {
+      await db.execute(`ALTER TABLE matches ADD COLUMN home_penalties INTEGER DEFAULT NULL`);
+    } catch (e) { /* column already exists */ }
+    try {
+      await db.execute(`ALTER TABLE matches ADD COLUMN away_penalties INTEGER DEFAULT NULL`);
+    } catch (e) { /* column already exists */ }
+
+
     console.log('Database initialized.');
   } catch (error) {
     console.error('Error initializing database:', error);
