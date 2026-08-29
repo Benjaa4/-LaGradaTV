@@ -153,6 +153,9 @@ export const AppProvider = ({ children }) => {
           }
           return t;
         }));
+      } else {
+        const err = await res.json();
+        alert('Error al eliminar equipo: ' + err.error);
       }
     } catch (e) {
       console.error(e);

@@ -48,13 +48,21 @@ app.put('/api/tournaments/:id', async (req, res) => {
 // Delete a tournament
 app.delete('/api/tournaments/:id', async (req, res) => {
   try {
+    // First, delete matches for this tournament
     await db.execute({
-      sql: 'DELETE FROM tournaments WHERE id = ?',
+      sql: 'DELETE FROM matches WHERE tournament_id = ?',
       args: [req.params.id]
     });
-    // Also delete standings for this tournament
+
+    // Then delete standings for this tournament
     await db.execute({
       sql: 'DELETE FROM standings WHERE tournament_id = ?',
+      args: [req.params.id]
+    });
+
+    // Finally delete the tournament
+    await db.execute({
+      sql: 'DELETE FROM tournaments WHERE id = ?',
       args: [req.params.id]
     });
     res.json({ message: 'Tournament deleted' });
@@ -142,6 +150,12 @@ app.delete('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) 
   const { tournamentId, teamId } = req.params;
   
   try {
+    // Delete matches associated with this team first to avoid foreign key constraint errors
+    await db.execute({
+      sql: 'DELETE FROM matches WHERE home_team_id = ? OR away_team_id = ?',
+      args: [teamId, teamId]
+    });
+
     const result = await db.execute({
       sql: 'DELETE FROM standings WHERE id = ? AND tournament_id = ?',
       args: [teamId, tournamentId]
@@ -152,6 +166,7 @@ app.delete('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) 
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Get all videos
 app.get('/api/videos', async (req, res) => {
@@ -192,6 +207,13 @@ app.post('/api/albums', async (req, res) => {
 // Delete an album
 app.delete('/api/albums/:id', async (req, res) => {
   try {
+    // First delete all videos in this album
+    await db.execute({
+      sql: 'DELETE FROM videos WHERE album_id = ?',
+      args: [req.params.id]
+    });
+
+    // Then delete the album
     await db.execute({
       sql: 'DELETE FROM albums WHERE id = ?',
       args: [req.params.id]

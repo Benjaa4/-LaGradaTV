@@ -14,7 +14,7 @@ export function parseVideoUrl(url) {
       }
       if (videoId) {
         thumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&color=white`;
       }
     } else if (url.includes('twitch.tv')) {
       platform = 'twitch';

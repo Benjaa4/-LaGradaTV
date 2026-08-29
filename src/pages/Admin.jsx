@@ -42,6 +42,61 @@ function Modal({ title, onClose, children, icon }) {
   );
 }
 
+// ── Confirm Dialog Component ────────────────────────────────────────────────
+function ConfirmDialog({ title, message, onConfirm, onCancel, confirmLabel = 'Eliminar', icon }) {
+  return createPortal(
+    <div className="modal-overlay" onClick={onCancel} style={{ zIndex: 10000 }}>
+      <div
+        className="modal-content animate-scale-in"
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '380px', padding: '1.5rem' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+          <div style={{
+            width: '56px', height: '56px', borderRadius: '50%',
+            background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            {icon || <Trash2 size={24} color="#ef4444" />}
+          </div>
+        </div>
+        <h3 style={{ margin: '0 0 0.5rem', textAlign: 'center', fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+          {title}
+        </h3>
+        <p style={{ margin: '0 0 1.75rem', textAlign: 'center', fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          {message}
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            className="btn btn-glass"
+            style={{ flex: 1 }}
+            onClick={onCancel}
+          >
+            Cancelar
+          </button>
+          <button
+            className="btn"
+            style={{
+              flex: 1, fontWeight: '700',
+              background: 'linear-gradient(135deg,#ef4444,#b91c1c)',
+              color: 'white', border: 'none',
+              boxShadow: '0 4px 16px rgba(239,68,68,0.35)'
+            }}
+            onClick={() => {
+              onConfirm();
+              onCancel();
+            }}
+          >
+            <Trash2 size={15} /> {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+
 // ── Section Header ──────────────────────────────────────────────────────────
 function SectionHeader({ title, onAdd, addLabel = 'Añadir', count }) {
   return (
@@ -94,6 +149,8 @@ export default function Admin() {
   const [tournamentSubTab, setTournamentSubTab] = useState('standings'); // 'standings' | 'matches'
   const [viewingAlbumId, setViewingAlbumId] = useState(null);
   const [openModal, setOpenModal] = useState(null); // 'tournament' | 'team' | 'match' | 'video' | 'album' | 'location'
+  const [confirmAction, setConfirmAction] = useState(null); // { title, message, onConfirm }
+  const askConfirm = (title, message, onConfirm) => setConfirmAction({ title, message, onConfirm });
 
   // ── Form & Edit State ────────────────────────────────────────────────────
   const [editingTeamId, setEditingTeamId] = useState(null);
@@ -397,7 +454,7 @@ export default function Admin() {
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <p style={{ margin: 0, fontWeight: '700', color: team.disqualified ? '#ef4444' : 'var(--text-primary)', textDecoration: team.disqualified ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                   {team.name}
-                                  {team.disqualified && <span style={{ fontSize: '0.6rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '3px', textDecoration: 'none', fontWeight: '800' }}>DESC</span>}
+                                  {!!team.disqualified && <span style={{ fontSize: '0.6rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '3px', textDecoration: 'none', fontWeight: '800' }}>DESC</span>}
                                 </p>
                                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
                                   <StatBadge label="PJ" value={team.played} />
@@ -412,9 +469,11 @@ export default function Admin() {
                                   <Edit2 size={15} />
                                 </button>
                                 <button className="btn btn-danger" style={{ padding: '0.6rem', flexShrink: 0 }} onClick={() => {
-                                  if (window.confirm(`¿Seguro que deseas eliminar el equipo "${team.name}"?`)) {
-                                    deleteTeam(viewingTournamentId, team.id);
-                                  }
+                                  askConfirm(
+                                    `Eliminar Equipo`,
+                                    `¿Seguro que deseas eliminar el equipo "${team.name}"?`,
+                                    () => deleteTeam(viewingTournamentId, team.id)
+                                  );
                                 }}>
                                   <Trash2 size={15} />
                                 </button>
@@ -524,7 +583,7 @@ export default function Admin() {
                                   </div>
                                   <div style={{ display: 'flex', gap: '0.35rem' }}>
                                     <button className="btn btn-glass" style={{ padding: '0.4rem' }} onClick={() => { setEditingMatchId(match.id); setEditMatchData({ ...match }); }}><Edit2 size={14} /></button>
-                                    <button className="btn btn-danger" style={{ padding: '0.4rem' }} onClick={() => deleteMatch(match.id)}><Trash2 size={14} /></button>
+                                    <button className="btn btn-danger" style={{ padding: '0.4rem' }} onClick={() => askConfirm('Eliminar Partido', '¿Estás seguro de eliminar este partido?', () => deleteMatch(match.id))}><Trash2 size={14} /></button>
                                   </div>
                                 </div>
                                 <div style={{ padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -597,7 +656,7 @@ export default function Admin() {
                               Administrar
                             </button>
                             <button className="btn btn-glass" style={{ padding: '0.6rem' }} onClick={() => handleEditTournament(tournament)}><Edit2 size={15} /></button>
-                            <button className="btn btn-danger" style={{ padding: '0.6rem' }} onClick={() => deleteTournament(tournament.id)}><Trash2 size={15} /></button>
+                            <button className="btn btn-danger" style={{ padding: '0.6rem' }} onClick={() => askConfirm('Eliminar Torneo', `¿Estás seguro de eliminar el torneo "${tournament.name}"?`, () => deleteTournament(tournament.id))}><Trash2 size={15} /></button>
                           </div>
                         </div>
                       )}
@@ -688,7 +747,7 @@ export default function Admin() {
                       </div>
                       <div style={{ display: 'flex', gap: '0.35rem' }}>
                         <button className="btn btn-glass" style={{ padding: '0.5rem' }} onClick={() => { setEditingLocationId(loc.id); setEditLocationData({ ...loc }); }}><Edit2 size={14} /></button>
-                        <button className="btn btn-danger" style={{ padding: '0.5rem' }} onClick={() => deleteLocation(loc.id)}><Trash2 size={14} /></button>
+                        <button className="btn btn-danger" style={{ padding: '0.5rem' }} onClick={() => askConfirm('Eliminar Cancha', `¿Estás seguro de eliminar la cancha "${loc.name}"?`, () => deleteLocation(loc.id))}><Trash2 size={14} /></button>
                       </div>
                     </div>
                   )}
@@ -742,7 +801,7 @@ export default function Admin() {
                           </div>
                           <div style={{ display: 'flex', gap: '0.35rem' }}>
                             <button className="btn btn-glass" style={{ padding: '0.5rem' }} onClick={() => handleEditVideo(video)}><Edit2 size={14} /></button>
-                            <button className="btn btn-danger" style={{ padding: '0.5rem' }} onClick={() => deleteVideo(video.id)}><Trash2 size={14} /></button>
+                            <button className="btn btn-danger" style={{ padding: '0.5rem' }} onClick={() => askConfirm('Eliminar Video', `¿Estás seguro de eliminar el video "${video.title}"?`, () => deleteVideo(video.id))}><Trash2 size={14} /></button>
                           </div>
                         </div>
                       )}
@@ -777,7 +836,7 @@ export default function Admin() {
                             <div style={{ display: 'flex', gap: '0.35rem' }}>
                               <button className="btn btn-primary" style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem' }} onClick={() => setViewingAlbumId(album.id)}>Ver Videos</button>
                               <button className="btn btn-glass" style={{ padding: '0.4rem', fontSize: '0.78rem' }} onClick={() => handleEditAlbum(album)}><Edit2 size={13} /></button>
-                              <button className="btn btn-danger" style={{ padding: '0.4rem', fontSize: '0.78rem' }} onClick={() => deleteAlbum(album.id)}><Trash2 size={13} /></button>
+                              <button className="btn btn-danger" style={{ padding: '0.4rem', fontSize: '0.78rem' }} onClick={() => askConfirm('Eliminar Álbum', `¿Estás seguro de eliminar el álbum "${album.title}"?`, () => deleteAlbum(album.id))}><Trash2 size={13} /></button>
                             </div>
                           </div>
                         </>
@@ -990,6 +1049,16 @@ export default function Admin() {
             </button>
           </form>
         </Modal>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+        />
       )}
 
     </div>
