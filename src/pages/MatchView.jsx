@@ -125,7 +125,21 @@ export default function MatchView() {
       {embedUrl ? (
         <div className="glass-panel" style={{ padding: '1rem', overflow: 'hidden' }}>
           <h3 className="section-title" style={{ padding: '1rem' }}><Video size={18} /> Transmisión del Partido</h3>
-          <VideoPlayer embedUrl={embedUrl} title="Transmisión" />
+          <div className="video-container" style={{ 
+            width: '100%', 
+            aspectRatio: '16/9', 
+            background: '#000', 
+            borderRadius: '12px', 
+            overflow: 'hidden'
+          }}>
+            <iframe 
+              src={embedUrl}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              allow="autoplay; encrypted-media; fullscreen" 
+              allowFullScreen
+              title="Transmisión"
+            ></iframe>
+          </div>
         </div>
       ) : (
         <div className="glass-panel text-center" style={{ padding: '3rem 2rem' }}>
