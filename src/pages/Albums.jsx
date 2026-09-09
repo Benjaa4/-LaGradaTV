@@ -48,11 +48,12 @@ export default function Albums() {
               key={album.id} 
               className="hover-lift transition-all"
               style={{ 
-                background: 'var(--bg-dark)', 
-                borderRadius: 'var(--radius-lg)', 
+                background: 'var(--bg-card)', 
+                borderRadius: 'var(--radius-md)', 
                 overflow: 'hidden',
                 cursor: 'pointer',
-                border: '1px solid var(--border-glass)'
+                border: '1px solid var(--nm-border)',
+                boxShadow: 'var(--nm-shadow-raised-sm)'
               }}
               onClick={() => navigate(`/album/${album.id}`)}
             >
@@ -64,9 +65,9 @@ export default function Albums() {
                   onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1518605368461-1ee125b29b46?q=80&w=600&auto=format&fit=crop'; }}
                 />
               </div>
-              <div style={{ padding: '1.5rem' }}>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{album.title}</h3>
-                <p className="text-muted" style={{ fontSize: '0.9rem' }}>Creado el {album.date}</p>
+              <div style={{ padding: '0.75rem 0.85rem' }}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: '0.25rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{album.title}</h3>
+                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Creado el {album.date}</p>
               </div>
             </div>
           ))}

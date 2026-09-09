@@ -1,21 +1,98 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect, useContext, useCallback } from 'react';
 
 const AppContext = createContext();
 
 export const useAppContext = () => useContext(AppContext);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api` : 'http://localhost:3001/api');
 
 export const AppProvider = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.removeItem('appTheme');
+  }, []);
+
   const [tournaments, setTournaments] = useState([]);
   const [videos, setVideos] = useState([]);
   const [albums, setAlbums] = useState([]);
   const [locations, setLocations] = useState([]);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeMatchModal, setActiveMatchModal] = useState(null);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
 
-  // Load data from backend
+  // Favorites state persisted in localStorage
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      const saved = localStorage.getItem('appFavorites');
+      return saved ? JSON.parse(saved) : { teams: [], tournaments: [] };
+    } catch {
+      return { teams: [], tournaments: [] };
+    }
+  });
+
+  const toggleFavoriteTeam = (teamName) => {
+    if (!teamName) return;
+    setFavorites(prev => {
+      const exists = prev.teams.includes(teamName);
+      const nextTeams = exists ? prev.teams.filter(t => t !== teamName) : [...prev.teams, teamName];
+      const next = { ...prev, teams: nextTeams };
+      localStorage.setItem('appFavorites', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const toggleFavoriteTournament = (tournamentId) => {
+    if (!tournamentId) return;
+    setFavorites(prev => {
+      const exists = prev.tournaments.includes(tournamentId);
+      const nextTournaments = exists ? prev.tournaments.filter(id => id !== tournamentId) : [...prev.tournaments, tournamentId];
+      const next = { ...prev, tournaments: nextTournaments };
+      localStorage.setItem('appFavorites', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const isFavoriteTeam = (teamName) => favorites.teams.includes(teamName);
+  const isFavoriteTournament = (tournamentId) => favorites.tournaments.includes(tournamentId);
+
+  const openSearchModal = () => setSearchModalOpen(true);
+  const closeSearchModal = () => setSearchModalOpen(false);
+
+  const openMatchModal = (match) => {
+    setActiveMatchModal(match);
+  };
+
+  const closeMatchModal = () => {
+    setActiveMatchModal(null);
+  };
+
+  const logout = useCallback(() => {
+    setIsAdmin(false);
+    localStorage.removeItem('adminToken');
+  }, []);
+
+  // Helper autenticado para realizar llamadas a rutas protegidas
+  const authFetch = useCallback(async (url, options = {}) => {
+    const token = localStorage.getItem('adminToken');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    };
+
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 || res.status === 403) {
+      logout();
+      throw new Error('Sesión expirada o no autorizada');
+    }
+    return res;
+  }, [logout]);
+
+  // Load public data from backend
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -45,13 +122,36 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Verificar validez del token en el backend al inicializar
   useEffect(() => {
     fetchData();
-    // Check if there is a token in localstorage
-    if (localStorage.getItem('adminToken')) {
-      setIsAdmin(true);
-    }
-  }, []);
+
+    const verifyExistingToken = async () => {
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        setIsAdmin(false);
+        setAuthChecking(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/auth/verify`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setIsAdmin(true);
+        } else {
+          logout();
+        }
+      } catch {
+        logout();
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+
+    verifyExistingToken();
+  }, [logout]);
 
   const login = async (username, password) => {
     try {
@@ -61,7 +161,7 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success && data.token) {
         setIsAdmin(true);
         localStorage.setItem('adminToken', data.token);
         return true;
@@ -73,20 +173,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setIsAdmin(false);
-    localStorage.removeItem('adminToken');
-  };
-
   const updateTeamStats = async (tournamentId, teamId, newStats) => {
     try {
-      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/standings/${teamId}`, {
+      const res = await authFetch(`${API_URL}/tournaments/${tournamentId}/standings/${teamId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStats)
       });
       if (res.ok) {
-        // Update local state to avoid refetching everything
         setTournaments(prev => prev.map(t => {
           if (t.id === tournamentId) {
             return {
@@ -114,12 +207,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const addTeam = async (tournamentId, name) => {
+  const addTeam = async (tournamentId, name, logo = '') => {
     try {
-      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/standings`, {
+      const res = await authFetch(`${API_URL}/tournaments/${tournamentId}/standings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name, logo })
       });
       if (res.ok) {
         const newTeam = await res.json();
@@ -140,7 +232,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteTeam = async (tournamentId, teamId) => {
     try {
-      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/standings/${teamId}`, {
+      const res = await authFetch(`${API_URL}/tournaments/${tournamentId}/standings/${teamId}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -153,11 +245,10 @@ export const AppProvider = ({ children }) => {
           }
           return t;
         }));
-        // Remove matches associated with this team
         setMatches(prev => prev.filter(m => m.home_team_id !== teamId && m.away_team_id !== teamId));
       } else {
         const err = await res.json();
-        alert('Error al eliminar equipo: ' + err.error);
+        alert('Error al eliminar equipo: ' + (err.error || 'Error desconocido'));
       }
     } catch (e) {
       console.error(e);
@@ -166,9 +257,8 @@ export const AppProvider = ({ children }) => {
 
   const addVideo = async (video) => {
     try {
-      const res = await fetch(`${API_URL}/videos`, {
+      const res = await authFetch(`${API_URL}/videos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(video)
       });
       if (res.ok) {
@@ -182,7 +272,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteVideo = async (id) => {
     try {
-      const res = await fetch(`${API_URL}/videos/${id}`, {
+      const res = await authFetch(`${API_URL}/videos/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -195,9 +285,8 @@ export const AppProvider = ({ children }) => {
 
   const addAlbum = async (album) => {
     try {
-      const res = await fetch(`${API_URL}/albums`, {
+      const res = await authFetch(`${API_URL}/albums`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(album)
       });
       if (res.ok) {
@@ -211,7 +300,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteAlbum = async (id) => {
     try {
-      const res = await fetch(`${API_URL}/albums/${id}`, {
+      const res = await authFetch(`${API_URL}/albums/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -222,11 +311,11 @@ export const AppProvider = ({ children }) => {
       console.error(e);
     }
   };
+
   const addTournament = async (tournament) => {
     try {
-      const res = await fetch(`${API_URL}/tournaments`, {
+      const res = await authFetch(`${API_URL}/tournaments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tournament)
       });
       if (res.ok) {
@@ -240,9 +329,8 @@ export const AppProvider = ({ children }) => {
 
   const editTournament = async (id, data) => {
     try {
-      const res = await fetch(`${API_URL}/tournaments/${id}`, {
+      const res = await authFetch(`${API_URL}/tournaments/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       if (res.ok) {
@@ -255,7 +343,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteTournament = async (id) => {
     try {
-      const res = await fetch(`${API_URL}/tournaments/${id}`, {
+      const res = await authFetch(`${API_URL}/tournaments/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -269,9 +357,8 @@ export const AppProvider = ({ children }) => {
 
   const editVideo = async (id, data) => {
     try {
-      const res = await fetch(`${API_URL}/videos/${id}`, {
+      const res = await authFetch(`${API_URL}/videos/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       if (res.ok) {
@@ -285,9 +372,8 @@ export const AppProvider = ({ children }) => {
 
   const editAlbum = async (id, data) => {
     try {
-      const res = await fetch(`${API_URL}/albums/${id}`, {
+      const res = await authFetch(`${API_URL}/albums/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       if (res.ok) {
@@ -301,9 +387,8 @@ export const AppProvider = ({ children }) => {
 
   const addLocation = async (location) => {
     try {
-      const res = await fetch(`${API_URL}/locations`, {
+      const res = await authFetch(`${API_URL}/locations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(location)
       });
       if (res.ok) {
@@ -317,9 +402,8 @@ export const AppProvider = ({ children }) => {
 
   const editLocation = async (id, data) => {
     try {
-      const res = await fetch(`${API_URL}/locations/${id}`, {
+      const res = await authFetch(`${API_URL}/locations/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       if (res.ok) {
@@ -332,7 +416,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteLocation = async (id) => {
     try {
-      const res = await fetch(`${API_URL}/locations/${id}`, {
+      const res = await authFetch(`${API_URL}/locations/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -345,9 +429,8 @@ export const AppProvider = ({ children }) => {
 
   const addMatch = async (match) => {
     try {
-      const res = await fetch(`${API_URL}/matches`, {
+      const res = await authFetch(`${API_URL}/matches`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(match)
       });
       if (res.ok) {
@@ -361,9 +444,8 @@ export const AppProvider = ({ children }) => {
 
   const editMatch = async (id, data) => {
     try {
-      const res = await fetch(`${API_URL}/matches/${id}`, {
+      const res = await authFetch(`${API_URL}/matches/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       if (res.ok) {
@@ -371,7 +453,6 @@ export const AppProvider = ({ children }) => {
         
         // --- Auto Progression Logic ---
         if (data.status === 'played' && data.round && data.round !== 'final') {
-          // Determine winner (check disqualification first)
           let winnerId = null;
           const tournament = tournaments.find(t => t.id === data.tournament_id);
           const homeTeam = tournament?.standings?.find(s => s.id === data.home_team_id);
@@ -404,16 +485,15 @@ export const AppProvider = ({ children }) => {
               if (isHomeSlot) updatedNextData.home_team_id = winnerId;
               else updatedNextData.away_team_id = winnerId;
 
-              // Fire & forget the update for the next match
-              fetch(`${API_URL}/matches/${nextMatch.id}`, {
+              // Actualización autenticada del siguiente partido
+              authFetch(`${API_URL}/matches/${nextMatch.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedNextData)
               }).then(r => {
                 if (r.ok) {
                   setMatches(prev => prev.map(m => m.id === nextMatch.id ? updatedNextData : m));
                 }
-              });
+              }).catch(err => console.error("Error en progresión de bracket:", err));
             }
           }
         }
@@ -426,7 +506,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteMatch = async (id) => {
     try {
-      const res = await fetch(`${API_URL}/matches/${id}`, {
+      const res = await authFetch(`${API_URL}/matches/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -439,14 +519,14 @@ export const AppProvider = ({ children }) => {
 
   const generateBracket = async (tournamentId) => {
     try {
-      const res = await fetch(`${API_URL}/tournaments/${tournamentId}/generate-bracket`, { method: 'POST' });
+      const res = await authFetch(`${API_URL}/tournaments/${tournamentId}/generate-bracket`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setMatches(prev => [...data.matches, ...prev]);
         return true;
       } else {
         const err = await res.json();
-        alert(err.error);
+        alert(err.error || 'Error al generar el bracket');
         return false;
       }
     } catch(e) {
@@ -457,12 +537,15 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{
-      isAdmin, login, logout,
+      isAdmin, authChecking, login, logout,
+      favorites, toggleFavoriteTeam, toggleFavoriteTournament, isFavoriteTeam, isFavoriteTournament,
+      searchModalOpen, openSearchModal, closeSearchModal,
       tournaments, addTournament, editTournament, deleteTournament, updateTeamStats, addTeam, deleteTeam,
       videos, addVideo, editVideo, deleteVideo,
       albums, addAlbum, editAlbum, deleteAlbum,
       locations, addLocation, editLocation, deleteLocation,
       matches, addMatch, editMatch, deleteMatch, generateBracket,
+      activeMatchModal, openMatchModal, closeMatchModal,
       loading
     }}>
       {children}

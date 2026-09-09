@@ -109,6 +109,11 @@ async function initDb() {
       await db.execute(`ALTER TABLE standings ADD COLUMN disqualified BOOLEAN DEFAULT 0`);
     } catch (e) { /* column already exists */ }
 
+    // Add logo to standings
+    try {
+      await db.execute(`ALTER TABLE standings ADD COLUMN logo TEXT`);
+    } catch (e) { /* column already exists */ }
+
     // Add penalties to matches
     try {
       await db.execute(`ALTER TABLE matches ADD COLUMN home_penalties INTEGER DEFAULT NULL`);

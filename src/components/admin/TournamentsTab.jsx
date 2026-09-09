@@ -1,0 +1,789 @@
+import { useState } from 'react';
+import { Trophy, Shield, Calendar as CalendarIcon, ArrowLeft, Edit2, Trash2, Plus, X, Check } from 'lucide-react';
+import { useAppContext } from '../../context/AppContext';
+import { Modal, ConfirmDialog, SectionHeader, EmptyState, StatBadge } from './AdminModal';
+import { ScoreInput, PenaltyInput } from './ScoreInput';
+import CustomDatePicker from '../CustomDatePicker';
+import CustomTimePicker from '../CustomTimePicker';
+import CustomSelect from '../CustomSelect';
+
+export default function TournamentsTab({ setViewingState }) {
+  const {
+    tournaments, addTournament, editTournament, deleteTournament,
+    addTeam, deleteTeam, updateTeamStats,
+    matches, addMatch, editMatch, deleteMatch, generateBracket,
+    locations
+  } = useAppContext();
+
+  // Navigation within tab
+  const [viewingTournamentId, setViewingTournamentId] = useState(null);
+  const [tournamentSubTab, setTournamentSubTab] = useState('standings'); // 'standings' | 'matches'
+
+  // Modals & confirms
+  const [openModal, setOpenModal] = useState(null); // 'tournament' | 'team' | 'match'
+  const [confirmAction, setConfirmAction] = useState(null);
+  const askConfirm = (title, message, onConfirm) => setConfirmAction({ title, message, onConfirm });
+
+  // Forms: Tournament
+  const [newTournamentName, setNewTournamentName] = useState('');
+  const [newTournamentType, setNewTournamentType] = useState('league');
+  const [newTournamentImage, setNewTournamentImage] = useState('');
+  const [editingTournamentId, setEditingTournamentId] = useState(null);
+  const [editTournamentData, setEditTournamentData] = useState({});
+
+  // Forms: Team
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamLogo, setNewTeamLogo] = useState('');
+  const [editingTeamId, setEditingTeamId] = useState(null);
+  const [editData, setEditData] = useState({});
+
+  // Forms: Match
+  const [newMatch, setNewMatch] = useState({
+    home_team_id: '', away_team_id: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '12:00', location_id: '', stream_url: '',
+    round: '', match_order: 0, description: '',
+    status: 'scheduled',
+    home_score: 0,
+    away_score: 0,
+    has_penalties: false,
+    home_penalties: null,
+    away_penalties: null
+  });
+  const [editingMatchId, setEditingMatchId] = useState(null);
+  const [editMatchData, setEditMatchData] = useState({});
+
+  const currentTournament = tournaments.find(t => t.id === viewingTournamentId);
+
+  // Notify parent if deep view is open (for tab visibility)
+  const handleSetViewing = (id) => {
+    setViewingTournamentId(id);
+    if (setViewingState) setViewingState(!!id);
+  };
+
+  // Handlers: Tournament
+  const handleAddTournament = (e) => {
+    e.preventDefault();
+    if (newTournamentName.trim()) {
+      addTournament({ name: newTournamentName.trim(), type: newTournamentType, image: newTournamentImage.trim() });
+      setNewTournamentName('');
+      setNewTournamentType('league');
+      setNewTournamentImage('');
+      setOpenModal(null);
+    }
+  };
+
+  const handleUpdateTournament = (id) => {
+    editTournament(id, editTournamentData);
+    setEditingTournamentId(null);
+  };
+
+  // Handlers: Team
+  const handleAddTeamSubmit = (e) => {
+    e.preventDefault();
+    if (newTeamName.trim() && viewingTournamentId) {
+      addTeam(viewingTournamentId, newTeamName.trim(), newTeamLogo.trim());
+      setNewTeamName('');
+      setNewTeamLogo('');
+      setOpenModal(null);
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }, 150);
+    }
+  };
+
+  const handleEditClick = (team) => {
+    setEditingTeamId(team.id);
+    setEditData({ ...team });
+  };
+
+  const handleUpdateStats = (teamId) => {
+    updateTeamStats(viewingTournamentId, teamId, editData);
+    setEditingTeamId(null);
+  };
+
+  // Handlers: Match
+  const handleAddMatch = (e) => {
+    e.preventDefault();
+    if (viewingTournamentId && newMatch.home_team_id && newMatch.away_team_id) {
+      let matchOrder = newMatch.match_order;
+      if (currentTournament?.type === 'knockout' && newMatch.round) {
+        const existingOrders = matches
+          .filter(m => m.tournament_id === viewingTournamentId && m.round === newMatch.round)
+          .map(m => m.match_order ?? 0);
+        matchOrder = existingOrders.length > 0 ? Math.max(...existingOrders) + 1 : 0;
+      }
+      const matchDataToAdd = {
+        ...newMatch,
+        match_order: matchOrder,
+        tournament_id: viewingTournamentId,
+        home_score: newMatch.status === 'played' ? (parseInt(newMatch.home_score) || 0) : 0,
+        away_score: newMatch.status === 'played' ? (parseInt(newMatch.away_score) || 0) : 0,
+        home_penalties: (newMatch.status === 'played' && newMatch.has_penalties)
+          ? (newMatch.home_penalties !== null && newMatch.home_penalties !== '' ? parseInt(newMatch.home_penalties) : null)
+          : null,
+        away_penalties: (newMatch.status === 'played' && newMatch.has_penalties)
+          ? (newMatch.away_penalties !== null && newMatch.away_penalties !== '' ? parseInt(newMatch.away_penalties) : null)
+          : null
+      };
+      delete matchDataToAdd.has_penalties;
+
+      addMatch(matchDataToAdd);
+      setNewMatch({
+        home_team_id: '', away_team_id: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '12:00', location_id: '', stream_url: '',
+        round: '', match_order: 0, description: '',
+        status: 'scheduled',
+        home_score: 0,
+        away_score: 0,
+        has_penalties: false,
+        home_penalties: null,
+        away_penalties: null
+      });
+      setOpenModal(null);
+    }
+  };
+
+  const handleSaveMatch = (originalMatch) => {
+    editMatch(originalMatch.id, editMatchData);
+    setEditingMatchId(null);
+  };
+
+  return (
+    <section className="animate-fade-in">
+      {/* ── View: Torneo Details ── */}
+      {viewingTournamentId && currentTournament ? (
+        <div className="animate-fade-in">
+          {/* Header con botón Volver */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            <button onClick={() => handleSetViewing(null)} className="btn btn-glass" style={{ padding: '0.5rem', borderRadius: '50%' }}>
+              <ArrowLeft size={18} />
+            </button>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800' }}>{currentTournament.name}</h2>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {currentTournament.type === 'knockout' ? 'Eliminatoria' : 'Liga'}
+              </p>
+            </div>
+          </div>
+
+          {/* Sub-tabs para Torneo */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)' }}>
+            <button
+              onClick={() => setTournamentSubTab('standings')}
+              className={`btn ${tournamentSubTab === 'standings' ? 'btn-primary' : 'btn-glass'}`}
+              style={{ flex: 1, borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0' }}
+            >
+              <Shield size={16} /> Equipos
+            </button>
+            <button
+              onClick={() => setTournamentSubTab('matches')}
+              className={`btn ${tournamentSubTab === 'matches' ? 'btn-primary' : 'btn-glass'}`}
+              style={{ flex: 1, borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0' }}
+            >
+              <CalendarIcon size={16} /> Partidos
+            </button>
+          </div>
+
+          {/* Sub-tab: Standings / Teams */}
+          {tournamentSubTab === 'standings' && (
+            <div className="animate-fade-in">
+              <SectionHeader
+                title="Equipos Participantes"
+                count={currentTournament.standings?.length || 0}
+                addLabel="Añadir Equipo"
+                onAdd={() => setOpenModal('team')}
+              />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {currentTournament.standings?.map((team, index) => (
+                  <div key={team.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+                    {editingTeamId === team.id ? (
+                      <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label" style={{ fontSize: '0.78rem' }}>Nombre del Equipo</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={editData.name || ''}
+                            onChange={e => setEditData({ ...editData, name: e.target.value })}
+                            autoFocus
+                          />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label" style={{ fontSize: '0.78rem' }}>URL del Logo (Opcional)</label>
+                          <input
+                            type="url"
+                            className="form-input"
+                            value={editData.logo || ''}
+                            onChange={e => setEditData({ ...editData, logo: e.target.value })}
+                          />
+                        </div>
+
+                        {/* Stats grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                          {[
+                            { label: 'PJ', key: 'played' }, { label: 'G', key: 'won' },
+                            { label: 'E', key: 'drawn' }, { label: 'P', key: 'lost' },
+                            { label: 'GF', key: 'goalsFor' }, { label: 'GC', key: 'goalsAgainst' },
+                            { label: 'Faltas', key: 'fouls' }, { label: 'PTS', key: 'points' }
+                          ].map(stat => (
+                            <div key={stat.key}>
+                              <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '700', textAlign: 'center', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
+                                {stat.label}
+                              </label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                style={{ textAlign: 'center', padding: '0.5rem 0.25rem', fontSize: '0.9rem' }}
+                                value={editData[stat.key] || 0}
+                                onChange={e => setEditData({ ...editData, [stat.key]: e.target.value })}
+                              />
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Disqualified checkbox */}
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', background: 'rgba(239,68,68,0.08)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                          <input
+                            type="checkbox"
+                            checked={!!editData.disqualified}
+                            onChange={e => setEditData({ ...editData, disqualified: e.target.checked })}
+                            style={{ width: '1.2rem', height: '1.2rem', accentColor: '#ef4444' }}
+                          />
+                          <div>
+                            <span style={{ color: '#ef4444', fontWeight: '700', display: 'block', fontSize: '0.88rem' }}>Equipo Descalificado</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>El rival avanzará automáticamente en llaves</span>
+                          </div>
+                        </label>
+
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                          <button className="btn btn-glass" style={{ flex: 1 }} onClick={() => setEditingTeamId(null)}>
+                            <X size={16} /> Cancelar
+                          </button>
+                          <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => handleUpdateStats(team.id)}>
+                            <Check size={16} /> Guardar Cambios
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: index < 3 ? 'var(--primary)' : 'var(--bg-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: '800', color: index < 3 ? 'white' : 'var(--text-muted)', flexShrink: 0 }}>
+                          {index + 1}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontWeight: '700', color: team.disqualified ? '#ef4444' : 'var(--text-primary)', textDecoration: team.disqualified ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            {team.name}
+                            {!!team.disqualified && <span style={{ fontSize: '0.6rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '3px', textDecoration: 'none', fontWeight: '800' }}>DESC</span>}
+                          </p>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                            <StatBadge label="PJ" value={team.played} />
+                            <StatBadge label="G" value={team.won} />
+                            <StatBadge label="GF" value={team.goalsFor} />
+                            <StatBadge label="GC" value={team.goalsAgainst} />
+                            <StatBadge label="Pts" value={team.points} highlight />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button className="btn btn-glass" style={{ padding: '0.6rem' }} onClick={() => handleEditClick(team)}>
+                            <Edit2 size={15} />
+                          </button>
+                          <button className="btn btn-danger" style={{ padding: '0.6rem' }} onClick={() => {
+                            askConfirm(
+                              'Eliminar Equipo',
+                              `¿Seguro que deseas eliminar el equipo "${team.name}"?`,
+                              () => deleteTeam(viewingTournamentId, team.id)
+                            );
+                          }}>
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {(!currentTournament?.standings || currentTournament.standings.length === 0) && (
+                  <EmptyState message="No hay equipos en este torneo" onAdd={() => setOpenModal('team')} addLabel="Añadir Equipo" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Sub-tab: Matches */}
+          {tournamentSubTab === 'matches' && (
+            <div className="animate-fade-in">
+              <SectionHeader
+                title="Partidos del Torneo"
+                count={matches.filter(m => m.tournament_id === viewingTournamentId).length}
+                addLabel="Añadir Partido"
+                onAdd={() => setOpenModal('match')}
+              />
+
+              {currentTournament.type === 'knockout' && matches.filter(m => m.tournament_id === viewingTournamentId).length === 0 && (
+                <div style={{ background: 'rgba(59,130,246,0.1)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px dashed rgba(59,130,246,0.3)', textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <h4 style={{ margin: '0 0 0.5rem', color: 'var(--primary)' }}>Fase Eliminatoria Vacía</h4>
+                  <p style={{ margin: '0 0 1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    Genera automáticamente la llave de 16 equipos (Octavos, Cuartos, Semis, Final) para ir llenándola después.
+                  </p>
+                  <button className="btn btn-primary" onClick={async () => {
+                    const success = await generateBracket(viewingTournamentId);
+                    if (success) alert('¡Llaves generadas correctamente!');
+                  }}>
+                    Generar Llaves de Eliminatoria
+                  </button>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {matches.filter(m => m.tournament_id === viewingTournamentId).map(match => {
+                  const homeTeam = currentTournament.standings?.find(s => s.id === match.home_team_id);
+                  const awayTeam = currentTournament.standings?.find(s => s.id === match.away_team_id);
+                  const isEditing = editingMatchId === match.id;
+
+                  return (
+                    <div key={match.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+                      {isEditing ? (
+                        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700' }}>Editar Partido</h3>
+                            <button className="btn btn-glass" style={{ padding: '0.4rem' }} onClick={() => setEditingMatchId(null)}>
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.72rem' }}>Fecha</label>
+                              <CustomDatePicker value={editMatchData.date} onChange={date => setEditMatchData({ ...editMatchData, date })} />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.72rem' }}>Hora</label>
+                              <CustomTimePicker value={editMatchData.time} onChange={time => setEditMatchData({ ...editMatchData, time })} />
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.72rem' }}>Estado</label>
+                              <CustomSelect
+                                value={editMatchData.status}
+                                onChange={val => setEditMatchData({ ...editMatchData, status: val })}
+                                options={[
+                                  { value: 'scheduled', label: 'Programado' },
+                                  { value: 'played',    label: 'Finalizado'  },
+                                ]}
+                                placeholder="Estado del partido"
+                              />
+                            </div>
+
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.72rem' }}>Cancha</label>
+                              <CustomSelect
+                                value={editMatchData.location_id || ''}
+                                onChange={val => setEditMatchData({ ...editMatchData, location_id: val })}
+                                options={[
+                                  { value: '', label: '— Sin cancha —' },
+                                  ...locations.map(loc => ({ value: loc.id, label: loc.name }))
+                                ]}
+                                placeholder="Sin cancha asignada"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ fontSize: '0.72rem' }}>URL del Video / Transmisión</label>
+                            <input
+                              type="url"
+                              className="form-input"
+                              placeholder="https://www.youtube.com/watch?v=..."
+                              value={editMatchData.stream_url || ''}
+                              onChange={e => setEditMatchData({ ...editMatchData, stream_url: e.target.value })}
+                            />
+                          </div>
+
+                          <div style={{ background: 'var(--bg-dark)', borderRadius: 'var(--radius-md)', padding: '1.25rem', border: '1px solid var(--border-glass)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: '700', textAlign: 'center', color: homeTeam?.disqualified ? '#ef4444' : 'var(--text-primary)', textDecoration: homeTeam?.disqualified ? 'line-through' : 'none' }}>
+                                  {homeTeam?.name || 'Por definir'}
+                                </span>
+                                <ScoreInput
+                                  value={editMatchData.home_score}
+                                  onChange={val => setEditMatchData({ ...editMatchData, home_score: val })}
+                                  style={{ width: '65px', textAlign: 'center', fontSize: '1.75rem', fontWeight: '800', padding: '0.5rem 0.25rem' }}
+                                />
+                              </div>
+                              <div style={{ color: 'var(--text-muted)', fontWeight: '700', fontSize: '0.9rem' }}>VS</div>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: '700', textAlign: 'center', color: awayTeam?.disqualified ? '#ef4444' : 'var(--text-primary)', textDecoration: awayTeam?.disqualified ? 'line-through' : 'none' }}>
+                                  {awayTeam?.name || 'Por definir'}
+                                </span>
+                                <ScoreInput
+                                  value={editMatchData.away_score}
+                                  onChange={val => setEditMatchData({ ...editMatchData, away_score: val })}
+                                  style={{ width: '65px', textAlign: 'center', fontSize: '1.75rem', fontWeight: '800', padding: '0.5rem 0.25rem' }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Penales si están empatados o si ya tiene penales */}
+                            {(editMatchData.home_score === editMatchData.away_score || editMatchData.home_penalties != null) && (
+                              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Penales:</span>
+                                <PenaltyInput
+                                  value={editMatchData.home_penalties}
+                                  onChange={val => setEditMatchData({ ...editMatchData, home_penalties: val })}
+                                  style={{ width: '50px', textAlign: 'center', padding: '0.25rem' }}
+                                />
+                                <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                <PenaltyInput
+                                  value={editMatchData.away_penalties}
+                                  onChange={val => setEditMatchData({ ...editMatchData, away_penalties: val })}
+                                  style={{ width: '50px', textAlign: 'center', padding: '0.25rem' }}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button className="btn btn-glass" style={{ flex: 1 }} onClick={() => setEditingMatchId(null)}>
+                              <X size={16} /> Cancelar
+                            </button>
+                            <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => handleSaveMatch(match)}>
+                              <Check size={16} /> Guardar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{match.date} {match.time}</span>
+                              {match.round && <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.08)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{match.round}</span>}
+                            </div>
+                            <p style={{ margin: 0, fontWeight: '700', fontSize: '0.92rem' }}>
+                              {homeTeam?.name || 'Por definir'} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>vs</span> {awayTeam?.name || 'Por definir'}
+                            </p>
+                            {match.status === 'played' && (
+                              <p style={{ margin: '0.2rem 0 0', fontWeight: '800', color: 'var(--primary)', fontSize: '0.9rem' }}>
+                                Resultado: {match.home_score} - {match.away_score}
+                                {(match.home_penalties != null && match.away_penalties != null) && ` (${match.home_penalties}-${match.away_penalties} pen.)`}
+                              </p>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                            <button className="btn btn-glass" style={{ padding: '0.6rem' }} onClick={() => {
+                              setEditingMatchId(match.id);
+                              setEditMatchData({ ...match });
+                            }}>
+                              <Edit2 size={15} />
+                            </button>
+                            <button className="btn btn-danger" style={{ padding: '0.6rem' }} onClick={() => {
+                              askConfirm(
+                                'Eliminar Partido',
+                                '¿Estás seguro de eliminar este partido?',
+                                () => deleteMatch(match.id)
+                              );
+                            }}>
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── Lista de Torneos ── */
+        <div>
+          <SectionHeader
+            title="Torneos Activos"
+            count={tournaments.length}
+            addLabel="Crear Torneo"
+            onAdd={() => setOpenModal('tournament')}
+          />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {tournaments.map(tournament => (
+              <div key={tournament.id} className="glass-panel" style={{ padding: '1rem 1.25rem' }}>
+                {editingTournamentId === tournament.id ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editTournamentData.name || ''}
+                      onChange={e => setEditTournamentData({ ...editTournamentData, name: e.target.value })}
+                      autoFocus
+                      placeholder="Nombre del Torneo"
+                    />
+                    <input
+                      type="url"
+                      className="form-input"
+                      value={editTournamentData.image || ''}
+                      onChange={e => setEditTournamentData({ ...editTournamentData, image: e.target.value })}
+                      placeholder="URL de Portada (Opcional)"
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => handleUpdateTournament(tournament.id)}>
+                        <Check size={16} /> Guardar
+                      </button>
+                      <button className="btn btn-glass" onClick={() => setEditingTournamentId(null)}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Trophy size={20} color="var(--primary)" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: '700', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+                        {tournament.name}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: tournament.type === 'knockout' ? '#f87171' : '#34d399', fontWeight: '600' }}>
+                        {tournament.type === 'knockout' ? 'Eliminatoria' : 'Liga'} · {tournament.standings?.length || 0} equipos
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button className="btn btn-primary" style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleSetViewing(tournament.id)}>
+                        Administrar
+                      </button>
+                      <button className="btn btn-glass" style={{ padding: '0.6rem' }} onClick={() => {
+                        setEditingTournamentId(tournament.id);
+                        setEditTournamentData({ ...tournament });
+                      }}>
+                        <Edit2 size={15} />
+                      </button>
+                      <button className="btn btn-danger" style={{ padding: '0.6rem' }} onClick={() => {
+                        askConfirm(
+                          'Eliminar Torneo',
+                          `¿Estás seguro de eliminar el torneo "${tournament.name}" y todos sus partidos asociados?`,
+                          () => deleteTournament(tournament.id)
+                        );
+                      }}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {tournaments.length === 0 && (
+              <EmptyState message="No hay torneos creados" onAdd={() => setOpenModal('tournament')} addLabel="Crear Torneo" />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modals ── */}
+      {openModal === 'tournament' && (
+        <Modal title="Nuevo Torneo" icon={<Trophy size={20} />} onClose={() => setOpenModal(null)}>
+          <form onSubmit={handleAddTournament} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Nombre del Torneo</label>
+              <input required autoFocus type="text" className="form-input" value={newTournamentName} onChange={e => setNewTournamentName(e.target.value)} placeholder="Ej: Torneo Apertura 2026" />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">URL de Portada (Opcional)</label>
+              <input type="url" className="form-input" value={newTournamentImage} onChange={e => setNewTournamentImage(e.target.value)} placeholder="https://..." />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Tipo de Torneo</label>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', cursor: 'pointer', background: newTournamentType === 'league' ? 'rgba(59,130,246,0.1)' : 'transparent' }}>
+                  <input type="radio" name="ttype" value="league" checked={newTournamentType === 'league'} onChange={() => setNewTournamentType('league')} />
+                  Liga
+                </label>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', cursor: 'pointer', background: newTournamentType === 'knockout' ? 'rgba(59,130,246,0.1)' : 'transparent' }}>
+                  <input type="radio" name="ttype" value="knockout" checked={newTournamentType === 'knockout'} onChange={() => setNewTournamentType('knockout')} />
+                  Eliminatoria
+                </label>
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary">
+              <Plus size={17} /> Crear Torneo
+            </button>
+          </form>
+        </Modal>
+      )}
+
+      {openModal === 'team' && (
+        <Modal title="Añadir Equipo" icon={<Shield size={20} />} onClose={() => setOpenModal(null)}>
+          <form onSubmit={handleAddTeamSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Nombre del Equipo</label>
+              <input required autoFocus type="text" className="form-input" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} placeholder="Ej: Real Central" />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">URL del Logo (Opcional)</label>
+              <input type="url" className="form-input" value={newTeamLogo} onChange={e => setNewTeamLogo(e.target.value)} placeholder="https://..." />
+            </div>
+            <button type="submit" className="btn btn-primary">
+              <Plus size={17} /> Añadir Equipo
+            </button>
+          </form>
+        </Modal>
+      )}
+
+      {openModal === 'match' && currentTournament && (
+        <Modal title="Añadir Partido" icon={<CalendarIcon size={20} />} onClose={() => setOpenModal(null)}>
+          <form onSubmit={handleAddMatch} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Equipo Local</label>
+                <CustomSelect
+                  value={newMatch.home_team_id}
+                  onChange={val => setNewMatch({ ...newMatch, home_team_id: val })}
+                  options={(currentTournament.standings || []).map(t => ({ value: t.id, label: t.name }))}
+                  placeholder="Seleccionar local"
+                />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Equipo Visitante</label>
+                <CustomSelect
+                  value={newMatch.away_team_id}
+                  onChange={val => setNewMatch({ ...newMatch, away_team_id: val })}
+                  options={(currentTournament.standings || []).map(t => ({ value: t.id, label: t.name }))}
+                  placeholder="Seleccionar visitante"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Fecha</label>
+                <CustomDatePicker value={newMatch.date} onChange={date => setNewMatch({ ...newMatch, date })} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Hora</label>
+                <CustomTimePicker value={newMatch.time} onChange={time => setNewMatch({ ...newMatch, time })} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Estado</label>
+                <CustomSelect
+                  value={newMatch.status}
+                  onChange={val => setNewMatch({ ...newMatch, status: val })}
+                  options={[
+                    { value: 'scheduled', label: 'Programado' },
+                    { value: 'played',    label: 'Finalizado'  },
+                  ]}
+                  placeholder="Estado del partido"
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Cancha (Opcional)</label>
+                <CustomSelect
+                  value={newMatch.location_id}
+                  onChange={val => setNewMatch({ ...newMatch, location_id: val })}
+                  options={[
+                    { value: '', label: '— Sin cancha —' },
+                    ...locations.map(loc => ({ value: loc.id, label: loc.name }))
+                  ]}
+                  placeholder="Sin cancha asignada"
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">URL de Video / Transmisión (YouTube, Twitch, etc.)</label>
+              <input
+                type="url"
+                className="form-input"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={newMatch.stream_url || ''}
+                onChange={e => setNewMatch({ ...newMatch, stream_url: e.target.value })}
+              />
+            </div>
+
+            {/* Marcador y penales si el partido se añade como Finalizado */}
+            {newMatch.status === 'played' && (
+              <div style={{ background: 'var(--bg-dark)', borderRadius: 'var(--radius-md)', padding: '1rem 1.25rem', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <label className="form-label" style={{ margin: 0, textAlign: 'center', fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                  Resultado Final
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-muted)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                      {currentTournament.standings?.find(t => t.id === newMatch.home_team_id)?.name || 'Local'}
+                    </span>
+                    <ScoreInput
+                      value={newMatch.home_score}
+                      onChange={val => setNewMatch({ ...newMatch, home_score: val })}
+                      style={{ width: '65px', textAlign: 'center', fontSize: '1.75rem', fontWeight: '800', padding: '0.4rem 0.25rem' }}
+                    />
+                  </div>
+                  <span style={{ fontWeight: '800', color: 'var(--text-muted)', fontSize: '0.9rem' }}>VS</span>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-muted)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                      {currentTournament.standings?.find(t => t.id === newMatch.away_team_id)?.name || 'Visitante'}
+                    </span>
+                    <ScoreInput
+                      value={newMatch.away_score}
+                      onChange={val => setNewMatch({ ...newMatch, away_score: val })}
+                      style={{ width: '65px', textAlign: 'center', fontSize: '1.75rem', fontWeight: '800', padding: '0.4rem 0.25rem' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Opción de penales */}
+                <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: newMatch.has_penalties ? '0.75rem' : 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!newMatch.has_penalties}
+                      onChange={e => setNewMatch({ ...newMatch, has_penalties: e.target.checked })}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    ¿Se definió por penales?
+                  </label>
+
+                  {newMatch.has_penalties && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Penales:</span>
+                      <PenaltyInput
+                        value={newMatch.home_penalties}
+                        onChange={val => setNewMatch({ ...newMatch, home_penalties: val })}
+                        style={{ width: '50px', textAlign: 'center', padding: '0.25rem' }}
+                      />
+                      <span style={{ color: 'var(--text-muted)' }}>-</span>
+                      <PenaltyInput
+                        value={newMatch.away_penalties}
+                        onChange={val => setNewMatch({ ...newMatch, away_penalties: val })}
+                        style={{ width: '50px', textAlign: 'center', padding: '0.25rem' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary">
+              <Plus size={17} /> Añadir Partido
+            </button>
+          </form>
+        </Modal>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
+    </section>
+  );
+}

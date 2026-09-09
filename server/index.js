@@ -1,20 +1,70 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'lagradatv_fallback_jwt_secret_please_change_in_production';
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'ariza';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'La1/2gRada1/2tbeE';
 
 app.use(cors());
 app.use(express.json());
 
+// --- Middleware de Autenticación y Autorización ---
+const requireAdmin = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Acceso no autorizado: Token requerido' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+};
+
 // --- Utilities ---
-const generateId = (prefix) => prefix + Date.now();
+// Generador de IDs seguro contra colisiones concurrentes
+const generateId = (prefix) => `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 
-// --- Endpoints ---
+// --- Endpoints de Autenticación ---
 
-// Add a new tournament
-app.post('/api/tournaments', async (req, res) => {
+// Login de Administrador
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Usuario y contraseña requeridos' });
+  }
+
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    const token = jwt.sign(
+      { username: ADMIN_USERNAME, role: 'admin' },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+  }
+});
+
+// Verificación de validez de token para hidratación de sesión en cliente
+app.get('/api/auth/verify', requireAdmin, (req, res) => {
+  res.json({ valid: true, user: req.user });
+});
+
+// --- Endpoints: Torneos ---
+
+// Add a new tournament (Admin only)
+app.post('/api/tournaments', requireAdmin, async (req, res) => {
   const { name, type, season, description, image } = req.body;
   const id = generateId('t');
 
@@ -29,8 +79,8 @@ app.post('/api/tournaments', async (req, res) => {
   }
 });
 
-// Edit a tournament
-app.put('/api/tournaments/:id', async (req, res) => {
+// Edit a tournament (Admin only)
+app.put('/api/tournaments/:id', requireAdmin, async (req, res) => {
   const { name, type, season, description, image } = req.body;
 
   try {
@@ -45,8 +95,8 @@ app.put('/api/tournaments/:id', async (req, res) => {
   }
 });
 
-// Delete a tournament
-app.delete('/api/tournaments/:id', async (req, res) => {
+// Delete a tournament (Admin only)
+app.delete('/api/tournaments/:id', requireAdmin, async (req, res) => {
   try {
     // First, delete matches for this tournament
     await db.execute({
@@ -71,7 +121,7 @@ app.delete('/api/tournaments/:id', async (req, res) => {
   }
 });
 
-// Get all tournaments with standings
+// Get all tournaments with standings (Public)
 app.get('/api/tournaments', async (req, res) => {
   try {
     const tournamentsResult = await db.execute('SELECT * FROM tournaments');
@@ -93,14 +143,14 @@ app.get('/api/tournaments', async (req, res) => {
   }
 });
 
-// Update a team's stats in a tournament
-app.put('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => {
+// Update a team's stats in a tournament (Admin only)
+app.put('/api/tournaments/:tournamentId/standings/:teamId', requireAdmin, async (req, res) => {
   const { tournamentId, teamId } = req.params;
   const stats = req.body;
 
   const query = `
     UPDATE standings 
-    SET played = ?, won = ?, drawn = ?, lost = ?, goalsFor = ?, goalsAgainst = ?, points = ?, fouls = ?, name = ?, disqualified = ?
+    SET played = ?, won = ?, drawn = ?, lost = ?, goalsFor = ?, goalsAgainst = ?, points = ?, fouls = ?, name = ?, disqualified = ?, logo = ?
     WHERE id = ? AND tournament_id = ?
   `;
 
@@ -115,6 +165,7 @@ app.put('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => 
     stats.fouls || 0,
     stats.name,
     stats.disqualified ? 1 : 0,
+    stats.logo || null,
     teamId,
     tournamentId
   ];
@@ -128,25 +179,25 @@ app.put('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => 
   }
 });
 
-// Add a team to a tournament
-app.post('/api/tournaments/:tournamentId/standings', async (req, res) => {
+// Add a team to a tournament (Admin only)
+app.post('/api/tournaments/:tournamentId/standings', requireAdmin, async (req, res) => {
   const { tournamentId } = req.params;
-  const { name } = req.body;
+  const { name, logo } = req.body;
   const id = generateId('eq');
 
   try {
     await db.execute({
-      sql: 'INSERT INTO standings (id, tournament_id, name, played, won, drawn, lost, goalsFor, goalsAgainst, points, fouls, disqualified) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0)',
-      args: [id, tournamentId, name]
+      sql: 'INSERT INTO standings (id, tournament_id, name, played, won, drawn, lost, goalsFor, goalsAgainst, points, fouls, disqualified, logo) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?)',
+      args: [id, tournamentId, name, logo || null]
     });
-    res.status(201).json({ id, tournament_id: tournamentId, name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, fouls: 0, disqualified: 0 });
+    res.status(201).json({ id, tournament_id: tournamentId, name, logo: logo || null, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, fouls: 0, disqualified: 0 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete a team from a tournament
-app.delete('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) => {
+// Delete a team from a tournament (Admin only)
+app.delete('/api/tournaments/:tournamentId/standings/:teamId', requireAdmin, async (req, res) => {
   const { tournamentId, teamId } = req.params;
 
   try {
@@ -167,8 +218,9 @@ app.delete('/api/tournaments/:tournamentId/standings/:teamId', async (req, res) 
   }
 });
 
+// --- Endpoints: Videos y Álbumes ---
 
-// Get all videos
+// Get all videos (Public)
 app.get('/api/videos', async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM videos ORDER BY date DESC');
@@ -178,7 +230,7 @@ app.get('/api/videos', async (req, res) => {
   }
 });
 
-// Get all albums
+// Get all albums (Public)
 app.get('/api/albums', async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM albums ORDER BY date DESC');
@@ -188,8 +240,8 @@ app.get('/api/albums', async (req, res) => {
   }
 });
 
-// Add a new album
-app.post('/api/albums', async (req, res) => {
+// Add a new album (Admin only)
+app.post('/api/albums', requireAdmin, async (req, res) => {
   const { title, thumbnail, date } = req.body;
   const id = generateId('a');
 
@@ -204,8 +256,8 @@ app.post('/api/albums', async (req, res) => {
   }
 });
 
-// Delete an album
-app.delete('/api/albums/:id', async (req, res) => {
+// Delete an album (Admin only)
+app.delete('/api/albums/:id', requireAdmin, async (req, res) => {
   try {
     // First delete all videos in this album
     await db.execute({
@@ -224,8 +276,8 @@ app.delete('/api/albums/:id', async (req, res) => {
   }
 });
 
-// Edit an album
-app.put('/api/albums/:id', async (req, res) => {
+// Edit an album (Admin only)
+app.put('/api/albums/:id', requireAdmin, async (req, res) => {
   const { title, thumbnail } = req.body;
 
   try {
@@ -240,8 +292,8 @@ app.put('/api/albums/:id', async (req, res) => {
   }
 });
 
-// Add a new video
-app.post('/api/videos', async (req, res) => {
+// Add a new video (Admin only)
+app.post('/api/videos', requireAdmin, async (req, res) => {
   const { title, url, thumbnail, type, date, album_id } = req.body;
   const id = generateId('v');
 
@@ -256,8 +308,8 @@ app.post('/api/videos', async (req, res) => {
   }
 });
 
-// Delete a video
-app.delete('/api/videos/:id', async (req, res) => {
+// Delete a video (Admin only)
+app.delete('/api/videos/:id', requireAdmin, async (req, res) => {
   try {
     await db.execute({
       sql: 'DELETE FROM videos WHERE id = ?',
@@ -269,8 +321,8 @@ app.delete('/api/videos/:id', async (req, res) => {
   }
 });
 
-// Edit a video
-app.put('/api/videos/:id', async (req, res) => {
+// Edit a video (Admin only)
+app.put('/api/videos/:id', requireAdmin, async (req, res) => {
   const { title, url, thumbnail, type, album_id } = req.body;
 
   try {
@@ -285,7 +337,9 @@ app.put('/api/videos/:id', async (req, res) => {
   }
 });
 
-// --- Locations ---
+// --- Endpoints: Ubicaciones / Canchas ---
+
+// Get all locations (Public)
 app.get('/api/locations', async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM locations ORDER BY name ASC');
@@ -295,7 +349,8 @@ app.get('/api/locations', async (req, res) => {
   }
 });
 
-app.post('/api/locations', async (req, res) => {
+// Add a location (Admin only)
+app.post('/api/locations', requireAdmin, async (req, res) => {
   const { name, map_url } = req.body;
   const id = generateId('loc');
   try {
@@ -309,7 +364,8 @@ app.post('/api/locations', async (req, res) => {
   }
 });
 
-app.put('/api/locations/:id', async (req, res) => {
+// Edit a location (Admin only)
+app.put('/api/locations/:id', requireAdmin, async (req, res) => {
   const { name, map_url } = req.body;
   try {
     const result = await db.execute({
@@ -323,7 +379,8 @@ app.put('/api/locations/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/locations/:id', async (req, res) => {
+// Delete a location (Admin only)
+app.delete('/api/locations/:id', requireAdmin, async (req, res) => {
   try {
     await db.execute({
       sql: 'DELETE FROM locations WHERE id = ?',
@@ -335,7 +392,9 @@ app.delete('/api/locations/:id', async (req, res) => {
   }
 });
 
-// --- Matches ---
+// --- Endpoints: Partidos ---
+
+// Get all matches (Public)
 app.get('/api/matches', async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM matches ORDER BY date DESC, time DESC');
@@ -345,7 +404,8 @@ app.get('/api/matches', async (req, res) => {
   }
 });
 
-app.post('/api/matches', async (req, res) => {
+// Add a match (Admin only)
+app.post('/api/matches', requireAdmin, async (req, res) => {
   const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description } = req.body;
   const id = generateId('m');
   try {
@@ -359,7 +419,8 @@ app.post('/api/matches', async (req, res) => {
   }
 });
 
-app.put('/api/matches/:id', async (req, res) => {
+// Edit a match (Admin only)
+app.put('/api/matches/:id', requireAdmin, async (req, res) => {
   const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description } = req.body;
   try {
     const result = await db.execute({
@@ -373,9 +434,21 @@ app.put('/api/matches/:id', async (req, res) => {
   }
 });
 
-// Generate all empty bracket matches for a knockout tournament
-// Structure: 8 matches in round_of_16, 4 in quarterfinal, 2 in semifinal, 1 in final = 15 matches total
-app.post('/api/tournaments/:id/generate-bracket', async (req, res) => {
+// Delete a match (Admin only)
+app.delete('/api/matches/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.execute({
+      sql: 'DELETE FROM matches WHERE id = ?',
+      args: [req.params.id]
+    });
+    res.json({ message: 'Match deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate all empty bracket matches for a knockout tournament (Admin only)
+app.post('/api/tournaments/:id/generate-bracket', requireAdmin, async (req, res) => {
   const { id: tournamentId } = req.params;
   try {
     // Check if matches already exist for this tournament
@@ -391,7 +464,7 @@ app.post('/api/tournaments/:id/generate-bracket', async (req, res) => {
       { key: 'final', count: 1 },
     ];
 
-    const PLACEHOLDER = 'tbd'; // "to be defined" placeholder team ID
+    const PLACEHOLDER = 'tbd';
     const created = [];
 
     for (const round of rounds) {
@@ -411,35 +484,12 @@ app.post('/api/tournaments/:id/generate-bracket', async (req, res) => {
   }
 });
 
-
-app.delete('/api/matches/:id', async (req, res) => {
-  try {
-    await db.execute({
-      sql: 'DELETE FROM matches WHERE id = ?',
-      args: [req.params.id]
-    });
-    res.json({ message: 'Match deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Admin login simple
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  if (username === 'ariza' && password === 'La1/2gRada1/2tbeE') {
-    res.json({ success: true, token: 'fake-jwt-token' });
-  } else {
-    res.status(401).json({ success: false, message: 'Invalid credentials' });
-  }
-});
-
-// Init with mock data if empty
-app.get('/api/init-mock', async (req, res) => {
+// Init with mock data if empty (Admin only)
+app.get('/api/init-mock', requireAdmin, async (req, res) => {
   try {
     const result = await db.execute('SELECT COUNT(*) as count FROM tournaments');
     if (result.rows[0].count === 0) {
-      const t1 = 't1';
+      const t1 = generateId('t');
       await db.execute({
         sql: 'INSERT INTO tournaments (id, name) VALUES (?, ?)',
         args: [t1, 'Liga de Verano - 1ra División']
@@ -447,12 +497,12 @@ app.get('/api/init-mock', async (req, res) => {
 
       await db.execute({
         sql: 'INSERT INTO standings (id, tournament_id, name, played, won, drawn, lost, goalsFor, goalsAgainst, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        args: ['eq1', t1, 'Atlético Central', 5, 4, 1, 0, 12, 3, 13]
+        args: [generateId('eq'), t1, 'Atlético Central', 5, 4, 1, 0, 12, 3, 13]
       });
 
       await db.execute({
         sql: 'INSERT INTO standings (id, tournament_id, name, played, won, drawn, lost, goalsFor, goalsAgainst, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        args: ['eq2', t1, 'Deportivo Sur', 5, 3, 1, 1, 9, 5, 10]
+        args: [generateId('eq'), t1, 'Deportivo Sur', 5, 3, 1, 1, 9, 5, 10]
       });
 
       res.json({ message: 'Mock data injected' });

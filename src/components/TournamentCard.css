@@ -1,75 +1,151 @@
 .tournament-card {
-  display: flex; flex-direction: column;
-  height: 100%; overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg-card);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--nm-border);
   border-radius: var(--radius-lg);
-  transition: transform 0.35s cubic-bezier(0.175,0.885,0.32,1.275),
-              border-color 0.3s, box-shadow 0.3s;
+  box-shadow: var(--nm-shadow-raised-sm);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s ease, border-color 0.2s ease;
   position: relative;
 }
+
 .tournament-card:hover {
-  transform: translateY(-6px);
-  border-color: rgba(16,185,129,0.4);
-  box-shadow: 0 16px 40px -10px rgba(16,185,129,0.2);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: var(--nm-shadow-raised);
 }
 
 .card-image-container {
-  height: 190px; position: relative; overflow: hidden;
+  height: 150px;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-darker);
 }
+
+@media (max-width: 640px) {
+  .card-image-container {
+    height: 140px;
+  }
+}
+
 .card-image {
-  width: 100%; height: 100%; object-fit: cover;
-  transition: transform 0.65s ease;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
 }
-.tournament-card:hover .card-image { transform: scale(1.07); }
+
+.tournament-card:hover .card-image {
+  transform: scale(1.04);
+}
 
 .card-overlay {
-  position: absolute; inset: 0;
-  background: linear-gradient(to bottom, transparent 30%, rgba(10,10,15,0.92));
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, rgba(14, 15, 20, 0.8) 100%);
 }
 
 .card-content {
-  padding: 0 1.5rem 1.5rem;
-  flex-grow: 1; display: flex; flex-direction: column;
-  margin-top: -24px; z-index: 2; position: relative;
+  padding: 1rem 1.15rem;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  z-index: 2;
+  position: relative;
 }
 
 .card-season {
-  font-size: 0.68rem; font-weight: 800;
-  text-transform: uppercase; letter-spacing: 1.5px;
-  background: rgba(16,185,129,0.12);
-  color: #34d399; border: 1px solid rgba(16,185,129,0.2);
-  padding: 0.2rem 0.75rem; border-radius: var(--radius-full);
-  width: fit-content; margin-bottom: 0.75rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  background: rgba(90, 100, 128, 0.15);
+  color: var(--primary-light);
+  border: 1px solid rgba(90, 100, 128, 0.28);
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--radius-full);
+  width: fit-content;
+  margin-bottom: 0.45rem;
 }
 
 .card-title {
-  font-size: 1.25rem; font-weight: 800;
-  margin: 0 0 0.5rem; color: var(--text-primary); line-height: 1.2;
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0 0 0.35rem;
+  color: var(--text-primary);
+  line-height: 1.25;
 }
 
 .card-description {
-  color: var(--text-secondary); font-size: 0.88rem;
-  margin-bottom: 1.25rem; line-height: 1.55;
-  display: -webkit-box; -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical; overflow: hidden; flex-grow: 1;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex-grow: 1;
 }
 
 .card-footer {
-  display: flex; justify-content: space-between; align-items: center;
-  border-top: 1px solid var(--border-glass); padding-top: 0.85rem; margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--nm-border);
+  padding-top: 0.65rem;
+  margin-top: auto;
 }
 
 .teams-count {
-  font-size: 0.82rem; color: var(--text-muted); font-weight: 500;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .view-details {
-  font-size: 0.85rem; font-weight: 700;
-  color: var(--text-secondary);
-  transition: all 0.25s ease;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-light);
+  transition: all 0.2s ease;
 }
+
 .tournament-card:hover .view-details {
-  color: #34d399;
-  transform: translateX(4px);
+  color: var(--text-primary);
+  transform: translateX(2px);
+}
+
+.tour-badge-format {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.tour-badge-format.badge-ko {
+  background: rgba(225, 95, 65, 0.28);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #f87171;
+  box-shadow: 0 2px 8px rgba(225, 95, 65, 0.25);
+}
+
+.tour-badge-format.badge-league {
+  background: rgba(46, 157, 116, 0.28);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  color: #4ade80;
+  box-shadow: 0 2px 8px rgba(46, 157, 116, 0.25);
 }

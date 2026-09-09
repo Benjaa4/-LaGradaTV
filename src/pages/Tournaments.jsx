@@ -13,18 +13,18 @@ export default function Tournaments() {
   );
 
   return (
-    <div className="animate-fade-in" style={{ padding: '2rem 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-        <Trophy size={32} color="var(--primary)" />
-        <h1 className="page-title" style={{ margin: 0, fontSize: '2.5rem' }}>Todos los Torneos</h1>
+    <div className="animate-fade-in" style={{ padding: '1rem 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+        <Trophy size={28} color="var(--primary)" />
+        <h1 className="page-title" style={{ margin: 0, fontSize: 'clamp(1.6rem, 3.5vw, 2.2rem)' }}>Todos los Torneos</h1>
       </div>
       
-      <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', maxWidth: '700px', marginBottom: '2rem', lineHeight: '1.6' }}>
+      <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', maxWidth: '700px', marginBottom: '1.25rem', lineHeight: '1.5' }}>
         Descubre todos los torneos disponibles, sigue tus ligas favoritas y mantente al tanto de la competencia.
       </p>
 
-      <div className="form-group" style={{ marginBottom: '3rem', maxWidth: '400px', position: 'relative' }}>
-        <Search size={20} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+      <div className="form-group" style={{ marginBottom: '1.75rem', maxWidth: '400px', position: 'relative' }}>
+        <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
         <input 
           type="text" 
           className="form-input" 
@@ -44,9 +44,9 @@ export default function Tournaments() {
       </div>
 
       {filteredTournaments.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
-          <Trophy size={48} color="var(--border-glass)" style={{ marginBottom: '1rem' }} />
-          <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>No se encontraron torneos</h3>
+        <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
+          <Trophy size={42} color="var(--nm-border-strong)" style={{ marginBottom: '0.75rem' }} />
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '0.4rem', color: 'var(--text-primary)' }}>No se encontraron torneos</h3>
           <p className="text-muted">Prueba con otra búsqueda o filtro.</p>
         </div>
       )}

@@ -40,7 +40,7 @@ export default function AlbumView() {
       </button>
 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2rem', marginBottom: '3rem', flexWrap: 'wrap' }}>
-        <div style={{ width: '200px', height: '200px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', flexShrink: 0, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+        <div style={{ width: '200px', height: '200px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', flexShrink: 0, boxShadow: 'var(--nm-shadow-raised)', border: '1px solid var(--nm-border)' }}>
           <img 
             src={album.thumbnail || 'https://images.unsplash.com/photo-1518605368461-1ee125b29b46?q=80&w=600&auto=format&fit=crop'} 
             alt={album.title} 
@@ -56,7 +56,7 @@ export default function AlbumView() {
         </div>
       </div>
 
-      <h2 className="section-title" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>Videos del Álbum</h2>
+      <h2 className="section-title" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--nm-border)', paddingBottom: '0.5rem' }}>Videos del Álbum</h2>
       
       {albumVideos.length > 0 ? (
         <div className="grid-container">

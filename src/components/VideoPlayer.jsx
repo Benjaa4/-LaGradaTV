@@ -34,13 +34,22 @@ export default function VideoPlayer({ video }) {
       
       <div className="video-info">
         <h3 className="video-title">{video.title}</h3>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-          <p className="video-date" style={{ margin: 0 }}>{video.date}</p>
-          {video.views !== undefined && (
-            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0, fontWeight: '500' }}>
-              {video.views} vistas
-            </p>
-          )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.6rem' }}>
+          <p className="video-date" style={{ margin: 0, fontSize: '0.78rem' }}>{video.date}</p>
+          <span style={{ 
+            fontSize: '0.7rem', 
+            fontWeight: '700', 
+            padding: '0.15rem 0.5rem', 
+            borderRadius: '4px', 
+            background: 'rgba(255,255,255,0.06)', 
+            border: '1px solid var(--nm-border)',
+            color: 'var(--text-secondary)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}>
+            <Tv size={11} color="var(--primary-light)" /> HD
+          </span>
         </div>
       </div>
     </div>

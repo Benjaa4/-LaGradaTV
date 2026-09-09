@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import StandingsTable from '../components/StandingsTable';
 import MatchCard from '../components/MatchCard';
 import KnockoutBracket from '../components/KnockoutBracket';
-import { Trophy, Users, Swords, ChevronLeft } from 'lucide-react';
+import { Trophy, Users, Swords, ChevronLeft, Calendar } from 'lucide-react';
 import { useState } from 'react';
 
 export default function TournamentDetails() {
@@ -145,9 +145,11 @@ export default function TournamentDetails() {
                 ))}
               </div>
             ) : (
-              <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--bg-darker)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-glass)' }}>
-                <p style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📅</p>
-                <p style={{ fontWeight: 600, marginBottom: '0.3rem' }}>Sin partidos aún</p>
+              <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--nm-border)', boxShadow: 'var(--nm-shadow-inset-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
+                  <Calendar size={36} />
+                </div>
+                <p style={{ fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-primary)' }}>Sin partidos aún</p>
                 <p className="text-muted" style={{ fontSize: '0.9rem' }}>
                   Los partidos aparecerán aquí cuando sean programados desde el panel de administración.
                 </p>
@@ -160,20 +162,25 @@ export default function TournamentDetails() {
       <style>{`
         .td-tabs {
           display: flex; gap: 0.5rem; flex-wrap: wrap;
-          border-bottom: 1px solid var(--border-glass); padding-bottom: 0;
+          padding: 0.35rem; background: var(--bg-sunken);
+          border-radius: var(--radius-md); box-shadow: var(--nm-shadow-inset-sm);
+          width: fit-content; margin-bottom: 2rem;
         }
         .td-tab {
-          display: flex; align-items: center; gap: 0.4rem;
-          padding: 0.6rem 1.25rem; background: none; border: none;
-          color: var(--text-muted); font-weight: 600; font-size: 0.88rem;
-          cursor: pointer; border-bottom: 2px solid transparent;
-          margin-bottom: -1px; transition: all 0.2s; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+          display: flex; align-items: center; gap: 0.5rem;
+          padding: 0.6rem 1.25rem; background: transparent; border: none;
+          color: var(--text-secondary); font-weight: 600; font-size: 0.9rem;
+          cursor: pointer; border-radius: var(--radius-sm);
+          transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease, color 0.18s ease;
+          -webkit-tap-highlight-color: transparent !important;
+          outline: none !important;
         }
         .td-tab:hover { color: var(--text-primary); }
+        .td-tab:active { transform: scale(0.94) !important; }
         .td-tab-active {
-          color: var(--text-primary) !important;
-          border-bottom-color: var(--blue) !important;
-          background: rgba(59,130,246,0.06);
+          color: var(--primary) !important;
+          background: var(--bg-card) !important;
+          box-shadow: var(--nm-shadow-raised-sm) !important;
         }
       `}</style>
     </div>

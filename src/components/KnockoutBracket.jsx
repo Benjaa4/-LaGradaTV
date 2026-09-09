@@ -1,4 +1,7 @@
+import { useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { Trophy, Check } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ALL_ROUNDS = [
@@ -28,6 +31,7 @@ function getWinnerId(match, teams) {
 
 // ── Match card ────────────────────────────────────────────────────────────────
 function MatchCard({ match, teams, isFinal }) {
+  const { openMatchModal } = useAppContext();
   const isTbd = !match || match.home_team_id === 'tbd';
   const homeTeam = !isTbd ? teams.find(t => t.id === match.home_team_id) : null;
   const awayTeam = !isTbd ? teams.find(t => t.id === match.away_team_id) : null;
@@ -43,7 +47,11 @@ function MatchCard({ match, teams, isFinal }) {
 
   const inner = (
     <>
-      {isFinal && <div className="kb-crown">🏆 GRAN FINAL</div>}
+      {isFinal && (
+        <div className="kb-crown" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+          <Trophy size={13} className="gold-text" /> GRAN FINAL
+        </div>
+      )}
 
       {/* Home */}
       <div className={['kb-team', winnerId === match?.home_team_id ? 'kb-team--win' : '', winnerId && winnerId !== match?.home_team_id ? 'kb-team--loss' : ''].filter(Boolean).join(' ')}>
@@ -52,7 +60,7 @@ function MatchCard({ match, teams, isFinal }) {
           {homeTeam?.name ?? 'Por definir'}
         </span>
         {isPlayed && <span className={`kb-score ${winnerId === match.home_team_id ? 'kb-score--win' : ''}`}>{match.home_score}{hasPens && <sub className="kb-pens">({match.home_penalties})</sub>}</span>}
-        {winnerId === match?.home_team_id && <span className="kb-tick">✓</span>}
+        {winnerId === match?.home_team_id && <span className="kb-tick"><Check size={11} strokeWidth={3} /></span>}
       </div>
 
       <div className="kb-divider" />
@@ -64,7 +72,7 @@ function MatchCard({ match, teams, isFinal }) {
           {awayTeam?.name ?? 'Por definir'}
         </span>
         {isPlayed && <span className={`kb-score ${winnerId === match.away_team_id ? 'kb-score--win' : ''}`}>{match.away_score}{hasPens && <sub className="kb-pens">({match.away_penalties})</sub>}</span>}
-        {winnerId === match?.away_team_id && <span className="kb-tick">✓</span>}
+        {winnerId === match?.away_team_id && <span className="kb-tick"><Check size={11} strokeWidth={3} /></span>}
       </div>
 
       <div className="kb-footer">
@@ -79,7 +87,17 @@ function MatchCard({ match, teams, isFinal }) {
   );
 
   if (isTbd || !match) return <div className={cardClass}>{inner}</div>;
-  return <Link to={`/partido/${match.id}`} className={cardClass}>{inner}</Link>;
+  return (
+    <div 
+      className={cardClass} 
+      onClick={() => openMatchModal(match)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openMatchModal(match); }}
+    >
+      {inner}
+    </div>
+  );
 }
 
 // ── Round column ──────────────────────────────────────────────────────────────
@@ -166,6 +184,8 @@ function RoundColumn({ round, matches, teams, slotFactor, isLast }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function KnockoutBracket({ matches, teams }) {
+  const scrollRef = useRef(null);
+
   const presentKeys = new Set(matches.map(m => m.round).filter(Boolean));
   const roundsToShow = presentKeys.size > 0
     ? ALL_ROUNDS.filter(r => presentKeys.has(r.key))
@@ -177,11 +197,19 @@ export default function KnockoutBracket({ matches, teams }) {
   const championId = finalMatch ? getWinnerId(finalMatch, teams) : null;
   const champion   = championId ? teams.find(t => t.id === championId) : null;
 
+  const scrollToRound = (idx) => {
+    if (!scrollRef.current) return;
+    const colWidth = window.innerWidth <= 600 ? 185 : 240;
+    scrollRef.current.scrollTo({ left: idx * colWidth, behavior: 'smooth' });
+  };
+
   return (
     <div className="kb-wrap">
       {champion && (
-        <div className="kb-champ">
-          <span className="kb-champ-trophy">🏆</span>
+        <div className="kb-champ gold-glow">
+          <span className="kb-champ-trophy" style={{ display: 'flex', alignItems: 'center' }}>
+            <Trophy size={26} className="gold-text" />
+          </span>
           <div>
             <p className="kb-champ-label">Campeón del Torneo</p>
             <p className="kb-champ-name">{champion.name}</p>
@@ -189,11 +217,20 @@ export default function KnockoutBracket({ matches, teams }) {
         </div>
       )}
 
-      {!champion && matches.length > 0 && (
-        <p className="kb-hint">Haz clic en un partido para ver sus detalles</p>
-      )}
+      {/* Phase Selector Chips (Mobile Friendly) */}
+      <div className="kb-phase-chips">
+        {roundsToShow.map((round, idx) => (
+          <button 
+            key={round.key} 
+            className="kb-phase-chip"
+            onClick={() => scrollToRound(idx)}
+          >
+            {round.label}
+          </button>
+        ))}
+      </div>
 
-      <div className="kb-scroll">
+      <div className="kb-scroll" ref={scrollRef}>
         <div className="kb-inner">
           {roundsToShow.map((round, idx) => (
             <RoundColumn
@@ -215,52 +252,60 @@ export default function KnockoutBracket({ matches, teams }) {
         .kb-champ { display:flex; align-items:center; gap:1rem; padding:1rem 1.5rem; background:linear-gradient(135deg,rgba(251,191,36,.14),rgba(245,158,11,.06)); border:1px solid rgba(251,191,36,.35); border-radius:var(--radius-md); animation:fadeIn .4s ease; }
         .kb-champ-trophy { font-size:2.2rem; line-height:1; }
         .kb-champ-label  { font-size:.7rem; font-weight:800; color:#fbbf24; text-transform:uppercase; letter-spacing:1px; margin:0 0 .1rem; }
-        .kb-champ-name   { font-size:1.35rem; font-weight:900; color:var(--text-primary); font-family:'Outfit',sans-serif; letter-spacing:-.02em; margin:0; }
+        .kb-champ-name   { font-size:1.35rem; font-weight:900; color:var(--text-primary); font-family:'Nunito',sans-serif; letter-spacing:-.02em; margin:0; }
 
         .kb-hint { font-size:.78rem; color:var(--text-muted); margin:0; text-align:right; padding-right:.5rem; }
 
+        /* Phase Chips */
+        .kb-phase-chips { display: flex; gap: 0.6rem; overflow-x: auto; padding-bottom: 0.5rem; margin-bottom: 0.75rem; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .kb-phase-chips::-webkit-scrollbar { display: none; }
+        .kb-phase-chip { padding: 0.45rem 1.1rem; border-radius: 99px; background: var(--bg-card); border: 1px solid var(--nm-border); box-shadow: var(--nm-shadow-raised-sm); color: var(--text-secondary); font-size: 0.8rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s ease, color 0.16s ease; -webkit-tap-highlight-color: transparent !important; outline: none !important; }
+        .kb-phase-chip:hover { color: var(--text-primary); }
+        .kb-phase-chip:active { transform: scale(0.94) !important; box-shadow: var(--nm-shadow-inset-sm) !important; color: var(--primary); }
+
         /* Scroll */
-        .kb-scroll { overflow-x:auto; padding-bottom:1.5rem; }
+        .kb-scroll { overflow-x:auto; padding-bottom:1.5rem; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-padding: 0 1rem; }
         .kb-inner  { display:flex; align-items:flex-start; gap:0; min-width:max-content; padding:.5rem 0; }
 
         /* Round column */
-        .kb-round { display:flex; flex-direction:column; width:240px; flex-shrink:0; position:relative; }
-        .kb-round-head { display:flex; align-items:center; justify-content:space-between; padding:.5rem .85rem; margin-bottom:.75rem; margin-right:40px; background:rgba(255,255,255,.04); border:1px solid var(--border-glass); border-radius:var(--radius-sm); }
+        .kb-round { display:flex; flex-direction:column; width:240px; flex-shrink:0; position:relative; scroll-snap-align: center; }
+        .kb-round-head { display:flex; align-items:center; justify-content:space-between; padding:.6rem .95rem; margin-bottom:.75rem; margin-right:40px; background:var(--bg-sunken); border:1px solid var(--nm-border); border-radius:var(--radius-sm); box-shadow: var(--nm-shadow-inset-sm); }
         .kb-round-label { font-size:.75rem; font-weight:800; color:var(--text-primary); text-transform:uppercase; letter-spacing:.8px; }
         .kb-round-cnt   { font-size:.65rem; color:var(--text-muted); }
 
         /* Connectors */
-        .kb-conn-h, .kb-conn-v { position:absolute; background:rgba(255,255,255,.18); }
-        .kb-conn-h { height:1px; }
-        .kb-conn-v { width:1px; }
+        .kb-conn-h, .kb-conn-v { position:absolute; background:var(--nm-border-strong); pointer-events: none; }
+        .kb-conn-h { height:2px; }
+        .kb-conn-v { width:2px; }
 
         /* Card */
-        .kb-card { display:flex; flex-direction:column; justify-content:center; width:200px; height:105px; border-radius:var(--radius-md); background:var(--bg-card); border:1px solid var(--border-glass); overflow:hidden; text-decoration:none; color:inherit; transition:border-color .2s,box-shadow .2s,transform .18s; cursor:pointer; }
-        .kb-card:hover { border-color:rgba(99,102,241,.5); box-shadow:0 4px 24px rgba(99,102,241,.18); transform:translateY(-2px); }
-        .kb-card--final { height:auto; min-height:105px; border-color:rgba(251,191,36,.35); box-shadow:0 0 22px rgba(251,191,36,.14); }
-        .kb-card--final:hover { border-color:rgba(251,191,36,.7); box-shadow:0 4px 28px rgba(251,191,36,.24); }
-        .kb-card--tbd   { opacity:.38; pointer-events:none; }
+        .kb-card { display:flex; flex-direction:column; justify-content:center; width:200px; height:105px; border-radius:var(--radius-md); background:var(--bg-card); border:1px solid var(--nm-border); box-shadow: var(--nm-shadow-raised-sm); overflow:hidden; text-decoration:none; color:inherit; transition:border-color .2s,box-shadow .2s,transform .18s cubic-bezier(0.16, 1, 0.3, 1); cursor:pointer; -webkit-tap-highlight-color: transparent !important; outline: none !important; }
+        .kb-card:hover { border-color:var(--primary); box-shadow:var(--nm-shadow-raised-hover); transform:translateY(-2px); }
+        .kb-card:active { transform: scale(0.97) !important; }
+        .kb-card--final { height:auto; min-height:105px; border-color:rgba(251,191,36,.4); box-shadow:0 0 20px rgba(251,191,36,.18); }
+        .kb-card--final:hover { border-color:rgba(251,191,36,.8); box-shadow:0 6px 26px rgba(251,191,36,.28); }
+        .kb-card--tbd   { opacity:.45; pointer-events:none; }
 
         .kb-crown { padding:.3rem .75rem; text-align:center; font-size:.62rem; font-weight:800; letter-spacing:1.2px; background:linear-gradient(90deg,rgba(251,191,36,.18),rgba(245,158,11,.08)); color:#fbbf24; border-bottom:1px solid rgba(251,191,36,.2); }
 
         /* Team rows */
         .kb-team { display:flex; align-items:center; gap:.45rem; padding:.48rem .65rem; transition:background .15s; }
-        .kb-team--win  { background:rgba(52,211,153,.1); }
-        .kb-team--loss { opacity:.35; }
+        .kb-team--win  { background:rgba(52,211,153,.12); }
+        .kb-team--loss { opacity:.38; }
 
-        .kb-avatar { width:26px; height:26px; border-radius:50%; flex-shrink:0; background:var(--bg-darker); border:1px solid var(--border-glass); display:flex; align-items:center; justify-content:center; font-size:.56rem; font-weight:800; color:var(--text-secondary); }
+        .kb-avatar { width:26px; height:26px; border-radius:50%; flex-shrink:0; background:var(--bg-sunken); border:1px solid var(--nm-border); box-shadow: var(--nm-shadow-inset-sm); display:flex; align-items:center; justify-content:center; font-size:.56rem; font-weight:800; color:var(--text-secondary); }
         .kb-team--win .kb-avatar { border-color:rgba(52,211,153,.55); color:#34d399; }
 
         .kb-name { flex:1; min-width:0; font-size:.8rem; font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-        .kb-score { font-size:.95rem; font-weight:800; color:var(--text-muted); font-family:'Outfit',sans-serif; flex-shrink:0; }
+        .kb-score { font-size:.95rem; font-weight:800; color:var(--text-muted); font-family:'Nunito',sans-serif; flex-shrink:0; }
         .kb-score--win { color:#34d399; }
         .kb-pens  { font-size:.58rem; color:#60a5fa; margin-left:.12rem; }
         .kb-tick  { font-size:.62rem; color:#34d399; flex-shrink:0; font-weight:800; }
 
-        .kb-divider { height:1px; background:var(--border-glass); }
+        .kb-divider { height:1px; background:var(--nm-border); }
 
-        .kb-footer { display:flex; align-items:center; justify-content:space-between; padding:.28rem .65rem; background:rgba(0,0,0,.2); border-top:1px solid var(--border-glass); font-size:.64rem; color:var(--text-muted); }
+        .kb-footer { display:flex; align-items:center; justify-content:space-between; padding:.32rem .65rem; background:var(--bg-sunken); border-top:1px solid var(--nm-border); font-size:.64rem; color:var(--text-muted); }
         .kb-status--played { color:#34d399; font-weight:700; }
         .kb-status--sched  { color:#fbbf24; }
         .kb-status--tbd    { font-style:italic; }
