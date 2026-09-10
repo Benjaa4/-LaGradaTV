@@ -135,8 +135,8 @@ app.delete('/api/tournaments/:id', requireAdmin, async (req, res) => {
 // Get all tournaments with standings (Public)
 app.get('/api/tournaments', async (req, res) => {
   try {
-    const tournamentsResult = await db.execute('SELECT * FROM tournaments');
-    const standingsResult = await db.execute('SELECT * FROM standings ORDER BY points DESC');
+    const tournamentsResult = await db.execute("SELECT * FROM tournaments WHERE id != 'tbd_system'");
+    const standingsResult = await db.execute("SELECT * FROM standings WHERE tournament_id != 'tbd_system' ORDER BY points DESC");
 
     const tournaments = tournamentsResult.rows;
     const standings = standingsResult.rows;
@@ -489,6 +489,7 @@ app.delete('/api/matches/:id', requireAdmin, async (req, res) => {
 // Generate all empty bracket matches for a knockout tournament (Admin only)
 app.post('/api/tournaments/:id/generate-bracket', requireAdmin, async (req, res) => {
   const { id: tournamentId } = req.params;
+  const { start_round = 'round_of_16' } = req.body || {};
   try {
     // Check if matches already exist for this tournament
     const existing = await db.execute({ sql: 'SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?', args: [tournamentId] });
@@ -496,12 +497,31 @@ app.post('/api/tournaments/:id/generate-bracket', requireAdmin, async (req, res)
       return res.status(400).json({ error: 'Este torneo ya tiene partidos generados.' });
     }
 
-    const rounds = [
+    // Ensure placeholder 'tbd' exists in tournaments and standings for foreign key constraints
+    try {
+      await db.execute({
+        sql: "INSERT OR IGNORE INTO tournaments (id, name, type) VALUES ('tbd_system', 'Sistema', 'knockout')"
+      });
+      await db.execute({
+        sql: "INSERT OR IGNORE INTO standings (id, tournament_id, name) VALUES ('tbd', 'tbd_system', 'Por confirmar')"
+      });
+    } catch (e) {
+      console.warn('Could not insert placeholder standings:', e.message);
+    }
+
+    // Obtain tournament match_type
+    const tourRes = await db.execute({ sql: 'SELECT match_type FROM tournaments WHERE id = ?', args: [tournamentId] });
+    const tournamentMatchType = tourRes.rows[0]?.match_type || 'f7';
+
+    const allPossibleRounds = [
       { key: 'round_of_16', count: 8 },
       { key: 'quarterfinal', count: 4 },
       { key: 'semifinal', count: 2 },
       { key: 'final', count: 1 },
     ];
+
+    const startIndex = allPossibleRounds.findIndex(r => r.key === start_round);
+    const rounds = startIndex !== -1 ? allPossibleRounds.slice(startIndex) : allPossibleRounds;
 
     const PLACEHOLDER = 'tbd';
     const created = [];
@@ -510,15 +530,35 @@ app.post('/api/tournaments/:id/generate-bracket', requireAdmin, async (req, res)
       for (let i = 0; i < round.count; i++) {
         const matchId = generateId('m');
         await db.execute({
-          sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, status, home_score, away_score, round, match_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          args: [matchId, tournamentId, PLACEHOLDER, PLACEHOLDER, 'TBD', '00:00', 'scheduled', 0, 0, round.key, i]
+          sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, status, home_score, away_score, round, match_order, match_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          args: [matchId, tournamentId, PLACEHOLDER, PLACEHOLDER, 'TBD', '00:00', 'scheduled', 0, 0, round.key, i, tournamentMatchType]
         });
-        created.push({ id: matchId, round: round.key, match_order: i, home_team_id: PLACEHOLDER, away_team_id: PLACEHOLDER, tournament_id: tournamentId, date: 'TBD', time: '00:00', status: 'scheduled', home_score: 0, away_score: 0, home_penalties: null, away_penalties: null, description: null, stream_url: null, location_id: null });
+        created.push({
+          id: matchId,
+          round: round.key,
+          match_order: i,
+          home_team_id: PLACEHOLDER,
+          away_team_id: PLACEHOLDER,
+          tournament_id: tournamentId,
+          date: 'TBD',
+          time: '00:00',
+          status: 'scheduled',
+          home_score: 0,
+          away_score: 0,
+          home_penalties: null,
+          away_penalties: null,
+          description: null,
+          stream_url: null,
+          location_id: null,
+          match_type: tournamentMatchType,
+          lineups: null
+        });
       }
     }
 
     res.status(201).json({ message: 'Bracket generated', matches: created });
   } catch (err) {
+    console.error('Error generating bracket:', err);
     res.status(500).json({ error: err.message });
   }
 });

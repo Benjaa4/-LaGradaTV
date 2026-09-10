@@ -520,15 +520,19 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const generateBracket = async (tournamentId) => {
+  const generateBracket = async (tournamentId, startRound = 'round_of_16') => {
     try {
-      const res = await authFetch(`${API_URL}/tournaments/${tournamentId}/generate-bracket`, { method: 'POST' });
+      const res = await authFetch(`${API_URL}/tournaments/${tournamentId}/generate-bracket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_round: startRound })
+      });
       if (res.ok) {
         const data = await res.json();
         setMatches(prev => [...data.matches, ...prev]);
         return true;
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         alert(err.error || 'Error al generar el bracket');
         return false;
       }

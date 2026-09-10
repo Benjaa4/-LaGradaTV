@@ -136,6 +136,11 @@ async function initDb() {
       await db.execute(`ALTER TABLE matches ADD COLUMN lineups TEXT`);
     } catch (e) { /* column already exists */ }
 
+    // Ensure placeholder 'tbd' exists in tournaments and standings for brackets (foreign keys)
+    try {
+      await db.execute(`INSERT OR IGNORE INTO tournaments (id, name, type) VALUES ('tbd_system', 'Sistema', 'knockout')`);
+      await db.execute(`INSERT OR IGNORE INTO standings (id, tournament_id, name) VALUES ('tbd', 'tbd_system', 'Por confirmar')`);
+    } catch (e) { /* ignore */ }
 
     console.log('Database initialized.');
   } catch (error) {

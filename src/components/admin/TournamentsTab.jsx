@@ -56,6 +56,7 @@ export default function TournamentsTab({ setViewingState }) {
   });
   const [editingMatchId, setEditingMatchId] = useState(null);
   const [editMatchData, setEditMatchData] = useState({});
+  const [bracketStartRound, setBracketStartRound] = useState('quarterfinal');
 
   const currentTournament = tournaments.find(t => t.id === viewingTournamentId);
 
@@ -333,16 +334,85 @@ export default function TournamentsTab({ setViewingState }) {
               />
 
               {currentTournament.type === 'knockout' && matches.filter(m => m.tournament_id === viewingTournamentId).length === 0 && (
-                <div style={{ background: 'rgba(59,130,246,0.1)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px dashed rgba(59,130,246,0.3)', textAlign: 'center', marginBottom: '1.5rem' }}>
-                  <h4 style={{ margin: '0 0 0.5rem', color: 'var(--primary)' }}>Fase Eliminatoria Vacía</h4>
-                  <p style={{ margin: '0 0 1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                    Genera automáticamente la llave de 16 equipos (Octavos, Cuartos, Semis, Final) para ir llenándola después.
-                  </p>
-                  <button className="btn btn-primary" onClick={async () => {
-                    const success = await generateBracket(viewingTournamentId);
-                    if (success) alert('¡Llaves generadas correctamente!');
+                <div style={{
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  padding: '1.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px dashed rgba(59, 130, 246, 0.35)',
+                  textAlign: 'center',
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.35rem', color: 'var(--primary-light)', fontSize: '1.1rem', fontWeight: 800 }}>
+                      Fase Eliminatoria Vacía
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-muted)', maxWidth: '520px' }}>
+                      Elige desde qué instancia comenzará el torneo para generar las llaves con partidos por confirmar (TBD):
+                    </p>
+                  </div>
+
+                  {/* Selector de Instancia Inicial */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    gap: '0.65rem',
+                    width: '100%',
+                    maxWidth: '580px'
                   }}>
-                    Generar Llaves de Eliminatoria
+                    {[
+                      { key: 'round_of_16', label: 'Octavos', desc: '16 eq. · 15 partidos' },
+                      { key: 'quarterfinal', label: 'Cuartos', desc: '8 eq. · 7 partidos' },
+                      { key: 'semifinal', label: 'Semifinales', desc: '4 eq. · 3 partidos' },
+                      { key: 'final', label: 'Final Directa', desc: '2 eq. · 1 partido' }
+                    ].map(r => {
+                      const isSelected = bracketStartRound === r.key;
+                      return (
+                        <button
+                          key={r.key}
+                          type="button"
+                          onClick={() => setBracketStartRound(r.key)}
+                          className="btn"
+                          style={{
+                            padding: '0.65rem 0.5rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '0.2rem',
+                            background: isSelected ? 'rgba(79, 109, 245, 0.22)' : 'rgba(255, 255, 255, 0.03)',
+                            borderColor: isSelected ? 'var(--primary)' : 'var(--border-glass)',
+                            boxShadow: isSelected ? '0 0 14px rgba(79, 109, 245, 0.3)' : 'none',
+                            color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            transition: 'all 0.18s ease'
+                          }}
+                        >
+                          <span style={{ fontWeight: 800, fontSize: '0.92rem' }}>{r.label}</span>
+                          <span style={{ fontSize: '0.68rem', color: isSelected ? 'var(--primary-light)' : 'var(--text-muted)' }}>{r.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button 
+                    type="button"
+                    className="btn btn-primary" 
+                    style={{ padding: '0.65rem 1.4rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                    onClick={async () => {
+                      const success = await generateBracket(viewingTournamentId, bracketStartRound);
+                      if (success) alert('¡Llaves generadas correctamente!');
+                    }}
+                  >
+                    <Trophy size={16} />
+                    Generar Llaves desde {
+                      bracketStartRound === 'round_of_16' ? 'Octavos' :
+                      bracketStartRound === 'quarterfinal' ? 'Cuartos' :
+                      bracketStartRound === 'semifinal' ? 'Semifinales' : 'la Final'
+                    }
                   </button>
                 </div>
               )}
