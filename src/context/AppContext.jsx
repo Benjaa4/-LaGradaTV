@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { getNextProgression } from '../utils/bracketUtils';
 
 const AppContext = createContext();
 
@@ -477,26 +478,29 @@ export const AppProvider = ({ children }) => {
           }
 
           if (winnerId) {
-            const nextRoundMap = { 'round_of_16': 'quarterfinal', 'quarterfinal': 'semifinal', 'semifinal': 'final' };
-            const nextRound = nextRoundMap[data.round];
-            const nextOrder = Math.floor((data.match_order || 0) / 2);
-            const isHomeSlot = (data.match_order || 0) % 2 === 0;
+            const progression = getNextProgression(data.round, data.match_order, data.bracket_code);
+            if (progression) {
+              const nextMatch = matches.find(m => 
+                m.tournament_id === data.tournament_id && (
+                  (m.bracket_code && m.bracket_code === progression.nextCode) ||
+                  (m.round === progression.nextRound && (m.match_order ?? 0) === progression.nextOrder)
+                )
+              );
+              if (nextMatch) {
+                const updatedNextData = { ...nextMatch };
+                if (progression.slot === 'home') updatedNextData.home_team_id = winnerId;
+                else updatedNextData.away_team_id = winnerId;
 
-            const nextMatch = matches.find(m => m.tournament_id === data.tournament_id && m.round === nextRound && m.match_order === nextOrder);
-            if (nextMatch) {
-              const updatedNextData = { ...nextMatch };
-              if (isHomeSlot) updatedNextData.home_team_id = winnerId;
-              else updatedNextData.away_team_id = winnerId;
-
-              // Actualización autenticada del siguiente partido
-              authFetch(`${API_URL}/matches/${nextMatch.id}`, {
-                method: 'PUT',
-                body: JSON.stringify(updatedNextData)
-              }).then(r => {
-                if (r.ok) {
-                  setMatches(prev => prev.map(m => m.id === nextMatch.id ? updatedNextData : m));
-                }
-              }).catch(err => console.error("Error en progresión de bracket:", err));
+                // Actualización autenticada del siguiente partido
+                authFetch(`${API_URL}/matches/${nextMatch.id}`, {
+                  method: 'PUT',
+                  body: JSON.stringify(updatedNextData)
+                }).then(r => {
+                  if (r.ok) {
+                    setMatches(prev => prev.map(m => m.id === nextMatch.id ? updatedNextData : m));
+                  }
+                }).catch(err => console.error("Error en progresión de bracket:", err));
+              }
             }
           }
         }

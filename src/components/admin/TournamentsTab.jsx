@@ -8,6 +8,14 @@ import CustomTimePicker from '../CustomTimePicker';
 import CustomSelect from '../CustomSelect';
 import EditLineupModal from '../lineup/EditLineupModal';
 import { MODALITIES } from '../../utils/lineupUtils';
+import { 
+  getBracketCode, 
+  getBracketLabel, 
+  getNextProgressionLabel, 
+  getBracketOptionsForRound,
+  getSlotFeederPlaceholder,
+  BRACKET_ROUNDS 
+} from '../../utils/bracketUtils';
 
 export default function TournamentsTab({ setViewingState }) {
   const {
@@ -48,11 +56,13 @@ export default function TournamentsTab({ setViewingState }) {
     time: '12:00', location_id: '', stream_url: '',
     round: '', match_order: 0, description: '',
     status: 'scheduled',
+    match_type: 'f7',
     home_score: 0,
     away_score: 0,
     has_penalties: false,
     home_penalties: null,
-    away_penalties: null
+    away_penalties: null,
+    bracket_code: ''
   });
   const [editingMatchId, setEditingMatchId] = useState(null);
   const [editMatchData, setEditMatchData] = useState({});
@@ -89,17 +99,28 @@ export default function TournamentsTab({ setViewingState }) {
     setEditingTournamentId(null);
   };
 
+  const handleEditTournament = (e) => {
+    e.preventDefault();
+    if (editTournamentData.name?.trim()) {
+      editTournament(editingTournamentId, {
+        ...editTournamentData,
+        match_type: editTournamentData.match_type || 'f7'
+      });
+      setEditingTournamentId(null);
+    }
+  };
+
   // Handlers: Team
   const handleAddTeamSubmit = (e) => {
     e.preventDefault();
-    if (newTeamName.trim() && viewingTournamentId) {
-      addTeam(viewingTournamentId, newTeamName.trim(), newTeamLogo.trim());
+    if (viewingTournamentId && newTeamName.trim()) {
+      addTeam(viewingTournamentId, { 
+        name: newTeamName.trim(),
+        logo: newTeamLogo.trim() || null
+      });
       setNewTeamName('');
       setNewTeamLogo('');
       setOpenModal(null);
-      setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-      }, 150);
     }
   };
 
@@ -118,14 +139,19 @@ export default function TournamentsTab({ setViewingState }) {
     e.preventDefault();
     if (viewingTournamentId && newMatch.home_team_id && newMatch.away_team_id) {
       let matchOrder = newMatch.match_order;
+      let bracketCode = newMatch.bracket_code;
       if (currentTournament?.type === 'knockout' && newMatch.round) {
-        const existingOrders = matches
-          .filter(m => m.tournament_id === viewingTournamentId && m.round === newMatch.round)
-          .map(m => m.match_order ?? 0);
-        matchOrder = existingOrders.length > 0 ? Math.max(...existingOrders) + 1 : 0;
+        if (!bracketCode) {
+          const existingOrders = matches
+            .filter(m => m.tournament_id === viewingTournamentId && m.round === newMatch.round)
+            .map(m => m.match_order ?? 0);
+          matchOrder = existingOrders.length > 0 ? Math.max(...existingOrders) + 1 : 0;
+          bracketCode = getBracketCode(newMatch.round, matchOrder);
+        }
       }
       const matchDataToAdd = {
         ...newMatch,
+        bracket_code: bracketCode || null,
         match_order: matchOrder,
         tournament_id: viewingTournamentId,
         match_type: newMatch.match_type || currentTournament?.match_type || 'f7',
@@ -152,14 +178,19 @@ export default function TournamentsTab({ setViewingState }) {
         away_score: 0,
         has_penalties: false,
         home_penalties: null,
-        away_penalties: null
+        away_penalties: null,
+        bracket_code: ''
       });
       setOpenModal(null);
     }
   };
 
   const handleSaveMatch = (originalMatch) => {
-    editMatch(originalMatch.id, editMatchData);
+    const updatedData = {
+      ...editMatchData,
+      bracket_code: editMatchData.bracket_code || (editMatchData.round ? getBracketCode(editMatchData.round, editMatchData.match_order) : null)
+    };
+    editMatch(originalMatch.id, updatedData);
     setEditingMatchId(null);
   };
 
@@ -418,10 +449,15 @@ export default function TournamentsTab({ setViewingState }) {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {matches.filter(m => m.tournament_id === viewingTournamentId).map(match => {
-                  const homeTeam = currentTournament.standings?.find(s => s.id === match.home_team_id);
-                  const awayTeam = currentTournament.standings?.find(s => s.id === match.away_team_id);
-                  const isEditing = editingMatchId === match.id;
+                {(() => {
+                  const tournamentMatches = matches.filter(m => m.tournament_id === viewingTournamentId);
+                  const presentRounds = Array.from(new Set(tournamentMatches.map(m => m.round).filter(Boolean)));
+                  return tournamentMatches.map(match => {
+                    const homeTeam = currentTournament.standings?.find(s => s.id === match.home_team_id);
+                    const awayTeam = currentTournament.standings?.find(s => s.id === match.away_team_id);
+                    const isEditing = editingMatchId === match.id;
+                    const bCode = match.bracket_code || (match.round ? getBracketCode(match.round, match.match_order) : null);
+                    const nextProgression = match.round ? getNextProgressionLabel(match.round, match.match_order, bCode) : null;
 
                   return (
                     <div key={match.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
@@ -498,6 +534,53 @@ export default function TournamentsTab({ setViewingState }) {
                             </div>
                           </div>
 
+                          {currentTournament?.type === 'knockout' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                              <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.72rem' }}>Fase / Instancia</label>
+                                <CustomSelect
+                                  value={editMatchData.round || ''}
+                                  onChange={val => {
+                                    const opts = getBracketOptionsForRound(val);
+                                    const defaultOpt = opts[0];
+                                    setEditMatchData({
+                                      ...editMatchData,
+                                      round: val,
+                                      bracket_code: defaultOpt?.value || '',
+                                      match_order: defaultOpt?.match_order ?? 0
+                                    });
+                                  }}
+                                  options={[
+                                    { value: '', label: '— Sin fase —' },
+                                    ...Object.values(BRACKET_ROUNDS).map(r => ({ value: r.key, label: r.label }))
+                                  ]}
+                                  placeholder="Seleccionar fase"
+                                />
+                              </div>
+                              <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.72rem' }}>Llave Semántica</label>
+                                <CustomSelect
+                                  value={editMatchData.bracket_code || ''}
+                                  onChange={val => {
+                                    const opts = getBracketOptionsForRound(editMatchData.round);
+                                    const selected = opts.find(o => o.value === val);
+                                    setEditMatchData({
+                                      ...editMatchData,
+                                      bracket_code: val,
+                                      match_order: selected?.match_order ?? editMatchData.match_order
+                                    });
+                                  }}
+                                  options={getBracketOptionsForRound(editMatchData.round).map(o => ({
+                                    value: o.value,
+                                    label: o.label
+                                  }))}
+                                  placeholder="Seleccionar llave"
+                                  disabled={!editMatchData.round}
+                                />
+                              </div>
+                            </div>
+                          )}
+
                           <button
                             type="button"
                             className="btn btn-glass"
@@ -512,7 +595,7 @@ export default function TournamentsTab({ setViewingState }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                                 <span style={{ fontSize: '0.78rem', fontWeight: '700', textAlign: 'center', color: homeTeam?.disqualified ? '#ef4444' : 'var(--text-primary)', textDecoration: homeTeam?.disqualified ? 'line-through' : 'none' }}>
-                                  {homeTeam?.name || 'Por definir'}
+                                  {homeTeam?.name || (match.round ? getSlotFeederPlaceholder(match.round, match.match_order, 'home', presentRounds) : 'Por definir')}
                                 </span>
                                 <ScoreInput
                                   value={editMatchData.home_score}
@@ -523,7 +606,7 @@ export default function TournamentsTab({ setViewingState }) {
                               <div style={{ color: 'var(--text-muted)', fontWeight: '700', fontSize: '0.9rem' }}>VS</div>
                               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                                 <span style={{ fontSize: '0.78rem', fontWeight: '700', textAlign: 'center', color: awayTeam?.disqualified ? '#ef4444' : 'var(--text-primary)', textDecoration: awayTeam?.disqualified ? 'line-through' : 'none' }}>
-                                  {awayTeam?.name || 'Por definir'}
+                                  {awayTeam?.name || (match.round ? getSlotFeederPlaceholder(match.round, match.match_order, 'away', presentRounds) : 'Por definir')}
                                 </span>
                                 <ScoreInput
                                   value={editMatchData.away_score}
@@ -566,14 +649,30 @@ export default function TournamentsTab({ setViewingState }) {
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{match.date} {match.time}</span>
-                              {match.round && <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.08)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{match.round}</span>}
+                              {match.round && (
+                                <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.08)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                  {BRACKET_ROUNDS[match.round]?.label || match.round}
+                                </span>
+                              )}
+                              {bCode && (
+                                <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '0.1rem 0.45rem', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: '700' }}>
+                                  Llave {bCode}
+                                </span>
+                              )}
                               <span style={{ fontSize: '0.65rem', background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
                                 {MODALITIES[match.match_type || currentTournament?.match_type || 'f7']?.tag || 'F7'}
                               </span>
                             </div>
                             <p style={{ margin: 0, fontWeight: '700', fontSize: '0.92rem' }}>
-                              {homeTeam?.name || 'Por definir'} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>vs</span> {awayTeam?.name || 'Por definir'}
+                              {homeTeam?.name || (match.round ? getSlotFeederPlaceholder(match.round, match.match_order, 'home', presentRounds) : 'Por definir')} 
+                              <span style={{ color: 'var(--text-muted)', fontWeight: '400', margin: '0 0.35rem' }}>vs</span> 
+                              {awayTeam?.name || (match.round ? getSlotFeederPlaceholder(match.round, match.match_order, 'away', presentRounds) : 'Por definir')}
                             </p>
+                            {nextProgression && (
+                              <p style={{ margin: '0.25rem 0 0', fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                <span>{nextProgression}</span>
+                              </p>
+                            )}
                             {match.status === 'played' && (
                               <p style={{ margin: '0.2rem 0 0', fontWeight: '800', color: 'var(--primary)', fontSize: '0.9rem' }}>
                                 Resultado: {match.home_score} - {match.away_score}
@@ -593,7 +692,11 @@ export default function TournamentsTab({ setViewingState }) {
                             </button>
                             <button className="btn btn-glass" style={{ padding: '0.6rem' }} onClick={() => {
                               setEditingMatchId(match.id);
-                              setEditMatchData({ ...match, match_type: match.match_type || currentTournament?.match_type || 'f7' });
+                              setEditMatchData({ 
+                                ...match, 
+                                match_type: match.match_type || currentTournament?.match_type || 'f7',
+                                bracket_code: match.bracket_code || (match.round ? getBracketCode(match.round, match.match_order) : '')
+                              });
                             }}>
                               <Edit2 size={15} />
                             </button>
@@ -611,7 +714,8 @@ export default function TournamentsTab({ setViewingState }) {
                       )}
                     </div>
                   );
-                })}
+                });
+                })()}
               </div>
             </div>
           )}
@@ -912,6 +1016,53 @@ export default function TournamentsTab({ setViewingState }) {
                 placeholder="Modalidad de fútbol"
               />
             </div>
+
+            {currentTournament?.type === 'knockout' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Fase / Instancia</label>
+                  <CustomSelect
+                    value={newMatch.round || ''}
+                    onChange={val => {
+                      const opts = getBracketOptionsForRound(val);
+                      const defaultOpt = opts[0];
+                      setNewMatch({
+                        ...newMatch,
+                        round: val,
+                        bracket_code: defaultOpt?.value || '',
+                        match_order: defaultOpt?.match_order ?? 0
+                      });
+                    }}
+                    options={[
+                      { value: '', label: '— Sin fase —' },
+                      ...Object.values(BRACKET_ROUNDS).map(r => ({ value: r.key, label: r.label }))
+                    ]}
+                    placeholder="Seleccionar fase"
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Llave Semántica</label>
+                  <CustomSelect
+                    value={newMatch.bracket_code || ''}
+                    onChange={val => {
+                      const opts = getBracketOptionsForRound(newMatch.round);
+                      const selected = opts.find(o => o.value === val);
+                      setNewMatch({
+                        ...newMatch,
+                        bracket_code: val,
+                        match_order: selected?.match_order ?? 0
+                      });
+                    }}
+                    options={getBracketOptionsForRound(newMatch.round).map(o => ({
+                      value: o.value,
+                      label: o.label
+                    }))}
+                    placeholder="Seleccionar llave"
+                    disabled={!newMatch.round}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Marcador y penales si el partido se añade como Finalizado */}
             {newMatch.status === 'played' && (

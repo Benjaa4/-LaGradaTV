@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Trophy, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { getBracketCode, getSlotFeederPlaceholder } from '../utils/bracketUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ALL_ROUNDS = [
@@ -11,7 +12,7 @@ const ALL_ROUNDS = [
   { key: 'final',        label: 'Final',      slots: 1 },
 ];
 
-const CARD_H = 105;
+const CARD_H = 110;
 const CARD_GAP = 20;
 
 // ── Helper: who won ───────────────────────────────────────────────────────────
@@ -30,14 +31,21 @@ function getWinnerId(match, teams) {
 }
 
 // ── Match card ────────────────────────────────────────────────────────────────
-function MatchCard({ match, teams, isFinal }) {
+function MatchCard({ match, teams, isFinal, presentRounds = [] }) {
   const { openMatchModal } = useAppContext();
-  const isTbd = !match || match.home_team_id === 'tbd';
-  const homeTeam = !isTbd ? teams.find(t => t.id === match.home_team_id) : null;
-  const awayTeam = !isTbd ? teams.find(t => t.id === match.away_team_id) : null;
+  const isTbd = !match || (match.home_team_id === 'tbd' && match.away_team_id === 'tbd');
+  const isHomeTbd = !match || match.home_team_id === 'tbd';
+  const isAwayTbd = !match || match.away_team_id === 'tbd';
+  
+  const homeTeam = !isHomeTbd ? teams.find(t => t.id === match.home_team_id) : null;
+  const awayTeam = !isAwayTbd ? teams.find(t => t.id === match.away_team_id) : null;
   const winnerId = match ? getWinnerId(match, teams) : null;
   const isPlayed = match?.status === 'played';
   const hasPens  = match?.home_penalties != null && match?.away_penalties != null;
+
+  const bracketCode = match?.bracket_code || getBracketCode(match?.round, match?.match_order);
+  const homePlaceholder = getSlotFeederPlaceholder(match?.round, match?.match_order, 'home', presentRounds);
+  const awayPlaceholder = getSlotFeederPlaceholder(match?.round, match?.match_order, 'away', presentRounds);
 
   const cardClass = [
     'kb-card',
@@ -47,17 +55,27 @@ function MatchCard({ match, teams, isFinal }) {
 
   const inner = (
     <>
-      {isFinal && (
+      {isFinal ? (
         <div className="kb-crown" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-          <Trophy size={13} className="gold-text" /> GRAN FINAL
+          <Trophy size={13} className="gold-text" /> GRAN FINAL {bracketCode ? `· ${bracketCode}` : ''}
+        </div>
+      ) : bracketCode && (
+        <div className="kb-sub-header">
+          <span className="kb-bracket-tag">Llave {bracketCode}</span>
         </div>
       )}
 
       {/* Home */}
       <div className={['kb-team', winnerId === match?.home_team_id ? 'kb-team--win' : '', winnerId && winnerId !== match?.home_team_id ? 'kb-team--loss' : ''].filter(Boolean).join(' ')}>
-        <span className="kb-avatar">{homeTeam ? homeTeam.name.slice(0,2).toUpperCase() : '?'}</span>
-        <span className="kb-name" style={{ textDecoration: homeTeam?.disqualified ? 'line-through' : 'none', color: homeTeam?.disqualified ? '#ef4444' : undefined }}>
-          {homeTeam?.name ?? 'Por definir'}
+        <span className={`kb-avatar ${isHomeTbd ? 'kb-avatar--tbd' : ''}`}>
+          {homeTeam ? homeTeam.name.slice(0,2).toUpperCase() : '?'}
+        </span>
+        <span 
+          className={`kb-name ${isHomeTbd ? 'kb-name--tbd' : ''}`}
+          style={{ textDecoration: homeTeam?.disqualified ? 'line-through' : 'none', color: homeTeam?.disqualified ? '#ef4444' : undefined }}
+          title={homeTeam?.name || homePlaceholder}
+        >
+          {homeTeam?.name ?? homePlaceholder}
         </span>
         {isPlayed && <span className={`kb-score ${winnerId === match.home_team_id ? 'kb-score--win' : ''}`}>{match.home_score}{hasPens && <sub className="kb-pens">({match.home_penalties})</sub>}</span>}
         {winnerId === match?.home_team_id && <span className="kb-tick"><Check size={11} strokeWidth={3} /></span>}
@@ -67,9 +85,15 @@ function MatchCard({ match, teams, isFinal }) {
 
       {/* Away */}
       <div className={['kb-team', winnerId === match?.away_team_id ? 'kb-team--win' : '', winnerId && winnerId !== match?.away_team_id ? 'kb-team--loss' : ''].filter(Boolean).join(' ')}>
-        <span className="kb-avatar">{awayTeam ? awayTeam.name.slice(0,2).toUpperCase() : '?'}</span>
-        <span className="kb-name" style={{ textDecoration: awayTeam?.disqualified ? 'line-through' : 'none', color: awayTeam?.disqualified ? '#ef4444' : undefined }}>
-          {awayTeam?.name ?? 'Por definir'}
+        <span className={`kb-avatar ${isAwayTbd ? 'kb-avatar--tbd' : ''}`}>
+          {awayTeam ? awayTeam.name.slice(0,2).toUpperCase() : '?'}
+        </span>
+        <span 
+          className={`kb-name ${isAwayTbd ? 'kb-name--tbd' : ''}`}
+          style={{ textDecoration: awayTeam?.disqualified ? 'line-through' : 'none', color: awayTeam?.disqualified ? '#ef4444' : undefined }}
+          title={awayTeam?.name || awayPlaceholder}
+        >
+          {awayTeam?.name ?? awayPlaceholder}
         </span>
         {isPlayed && <span className={`kb-score ${winnerId === match.away_team_id ? 'kb-score--win' : ''}`}>{match.away_score}{hasPens && <sub className="kb-pens">({match.away_penalties})</sub>}</span>}
         {winnerId === match?.away_team_id && <span className="kb-tick"><Check size={11} strokeWidth={3} /></span>}
@@ -101,7 +125,7 @@ function MatchCard({ match, teams, isFinal }) {
 }
 
 // ── Round column ──────────────────────────────────────────────────────────────
-function RoundColumn({ round, matches, teams, slotFactor, isLast }) {
+function RoundColumn({ round, matches, teams, slotFactor, isLast, presentRounds = [] }) {
   const roundMatches = [...matches]
     .filter(m => m.round === round.key)
     .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0));
@@ -157,7 +181,7 @@ function RoundColumn({ round, matches, teams, slotFactor, isLast }) {
               <div key={i}>
                 {/* Card */}
                 <div style={{ position: 'absolute', top: `${top}px`, left: 0, right: 40 }}>
-                  <MatchCard match={match} teams={teams} isFinal={round.key === 'final'} />
+                  <MatchCard match={match} teams={teams} isFinal={round.key === 'final'} presentRounds={presentRounds} />
                 </div>
 
                 {/* Connectors */}
@@ -192,6 +216,7 @@ export default function KnockoutBracket({ matches, teams }) {
     : ALL_ROUNDS;
 
   const rootSlots = roundsToShow[0]?.slots ?? 8;
+  const presentRoundsList = Array.from(presentKeys);
 
   const finalMatch = matches.find(m => m.round === 'final');
   const championId = finalMatch ? getWinnerId(finalMatch, teams) : null;
@@ -240,6 +265,7 @@ export default function KnockoutBracket({ matches, teams }) {
               teams={teams}
               slotFactor={rootSlots / round.slots}
               isLast={idx === roundsToShow.length - 1}
+              presentRounds={presentRoundsList}
             />
           ))}
         </div>
@@ -279,14 +305,16 @@ export default function KnockoutBracket({ matches, teams }) {
         .kb-conn-v { width:2px; }
 
         /* Card */
-        .kb-card { display:flex; flex-direction:column; justify-content:center; width:200px; height:105px; border-radius:var(--radius-md); background:var(--bg-card); border:1px solid var(--nm-border); box-shadow: var(--nm-shadow-raised-sm); overflow:hidden; text-decoration:none; color:inherit; transition:border-color .2s,box-shadow .2s,transform .18s cubic-bezier(0.16, 1, 0.3, 1); cursor:pointer; -webkit-tap-highlight-color: transparent !important; outline: none !important; }
+        .kb-card { display:flex; flex-direction:column; justify-content:center; width:200px; min-height:110px; border-radius:var(--radius-md); background:var(--bg-card); border:1px solid var(--nm-border); box-shadow: var(--nm-shadow-raised-sm); overflow:hidden; text-decoration:none; color:inherit; transition:border-color .2s,box-shadow .2s,transform .18s cubic-bezier(0.16, 1, 0.3, 1); cursor:pointer; -webkit-tap-highlight-color: transparent !important; outline: none !important; }
         .kb-card:hover { border-color:var(--primary); box-shadow:var(--nm-shadow-raised-hover); transform:translateY(-2px); }
         .kb-card:active { transform: scale(0.97) !important; }
-        .kb-card--final { height:auto; min-height:105px; border-color:rgba(251,191,36,.4); box-shadow:0 0 20px rgba(251,191,36,.18); }
+        .kb-card--final { height:auto; min-height:110px; border-color:rgba(251,191,36,.4); box-shadow:0 0 20px rgba(251,191,36,.18); }
         .kb-card--final:hover { border-color:rgba(251,191,36,.8); box-shadow:0 6px 26px rgba(251,191,36,.28); }
-        .kb-card--tbd   { opacity:.45; pointer-events:none; }
+        .kb-card--tbd   { opacity:.6; pointer-events:none; }
 
-        .kb-crown { padding:.3rem .75rem; text-align:center; font-size:.62rem; font-weight:800; letter-spacing:1.2px; background:linear-gradient(90deg,rgba(251,191,36,.18),rgba(245,158,11,.08)); color:#fbbf24; border-bottom:1px solid rgba(251,191,36,.2); }
+        .kb-crown { padding:.32rem .75rem; text-align:center; font-size:.64rem; font-weight:800; letter-spacing:1px; background:linear-gradient(90deg,rgba(251,191,36,.18),rgba(245,158,11,.08)); color:#fbbf24; border-bottom:1px solid rgba(251,191,36,.2); }
+        .kb-sub-header { display: flex; align-items: center; justify-content: flex-start; padding: 0.2rem 0.65rem; background: rgba(255, 255, 255, 0.025); border-bottom: 1px solid var(--nm-border); }
+        .kb-bracket-tag { font-size: 0.6rem; font-weight: 800; color: var(--primary-light); background: rgba(79, 109, 245, 0.12); padding: 0.08rem 0.38rem; border-radius: 4px; border: 1px solid rgba(79, 109, 245, 0.22); text-transform: uppercase; letter-spacing: 0.5px; }
 
         /* Team rows */
         .kb-team { display:flex; align-items:center; gap:.45rem; padding:.48rem .65rem; transition:background .15s; }
@@ -294,9 +322,11 @@ export default function KnockoutBracket({ matches, teams }) {
         .kb-team--loss { opacity:.38; }
 
         .kb-avatar { width:26px; height:26px; border-radius:50%; flex-shrink:0; background:var(--bg-sunken); border:1px solid var(--nm-border); box-shadow: var(--nm-shadow-inset-sm); display:flex; align-items:center; justify-content:center; font-size:.56rem; font-weight:800; color:var(--text-secondary); }
+        .kb-avatar--tbd { opacity: 0.45; border-style: dashed; }
         .kb-team--win .kb-avatar { border-color:rgba(52,211,153,.55); color:#34d399; }
 
         .kb-name { flex:1; min-width:0; font-size:.8rem; font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .kb-name--tbd { color: var(--text-muted) !important; font-style: italic; font-size: 0.74rem !important; }
 
         .kb-score { font-size:.95rem; font-weight:800; color:var(--text-muted); font-family:'Nunito',sans-serif; flex-shrink:0; }
         .kb-score--win { color:#34d399; }
