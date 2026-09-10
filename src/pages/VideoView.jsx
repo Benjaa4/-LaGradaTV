@@ -21,7 +21,7 @@ import {
 export default function VideoView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { videos, albums } = useAppContext();
+  const { videos, albums, matches, tournaments } = useAppContext();
   const [video, setVideo] = useState(null);
   const [parsed, setParsed] = useState(null);
   const [theaterMode, setTheaterMode] = useState(false);
@@ -34,8 +34,33 @@ export default function VideoView() {
     if (found) {
       setVideo(found);
       setParsed(parseVideoUrl(found.url));
+      return;
     }
-  }, [id, videos]);
+
+    // Support match video playback directly on page
+    const matchId = id.startsWith('match-') ? id.replace('match-', '') : id;
+    const matchFound = matches.find(m => m.id === matchId);
+    if (matchFound && matchFound.stream_url) {
+      const tour = tournaments.find(t => t.id === matchFound.tournament_id);
+      const homeTeam = tour?.standings?.find(s => s.id === matchFound.home_team_id);
+      const awayTeam = tour?.standings?.find(s => s.id === matchFound.away_team_id);
+      const hName = homeTeam?.name || 'Local';
+      const aName = awayTeam?.name || 'Visitante';
+      const tourName = tour?.name || 'Torneo';
+
+      const syntheticVideo = {
+        id: `match-${matchFound.id}`,
+        title: `${hName} vs ${aName} · ${tourName}`,
+        url: matchFound.stream_url,
+        date: matchFound.date || 'Reciente',
+        type: matchFound.status === 'live' ? 'live' : 'recording',
+        match_id: matchFound.id,
+        isMatchStream: true
+      };
+      setVideo(syntheticVideo);
+      setParsed(parseVideoUrl(matchFound.stream_url));
+    }
+  }, [id, videos, matches, tournaments]);
 
   const handleShare = () => {
     const url = window.location.href;

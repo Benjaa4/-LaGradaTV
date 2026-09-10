@@ -4,18 +4,20 @@ import { useAppContext } from '../context/AppContext';
 import { 
   ArrowLeft, Trophy, Calendar, Clock, MapPin, 
   Share2, Shield, Users, AlertTriangle, CheckCircle, 
-  FileText, ExternalLink, Video, ChevronRight, Award
+  FileText, ExternalLink, Video, ChevronRight, Award,
+  Sliders, Edit3
 } from 'lucide-react';
 import { getMatteTeamStyle } from '../utils/colorUtils';
-import { getMatchLineup } from '../utils/lineupUtils';
+import { getMatchLineup, MODALITIES } from '../utils/lineupUtils';
 import { parseVideoUrl } from '../utils/videoUtils';
 import TacticalPitch from '../components/lineup/TacticalPitch';
 import StackedCards from '../components/lineup/StackedCards';
+import EditLineupModal from '../components/lineup/EditLineupModal';
 
 export default function MatchView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { matches, tournaments, locations } = useAppContext();
+  const { matches, tournaments, locations, updateMatchLineups, isAdmin } = useAppContext();
 
   // Tab activo de vista táctica: 'home' | 'away' | 'both'
   const [activePitchView, setActivePitchView] = useState('home');
@@ -23,8 +25,11 @@ export default function MatchView() {
   const [activeRosterTab, setActiveRosterTab] = useState('starters');
 
   const match = matches.find(m => m.id === id);
-
   const tournament = tournaments.find(t => t.id === match?.tournament_id);
+
+  // Modalidad de fútbol: 'f5' | 'f7' | 'f11' (hereda del torneo si no está seteado)
+  const [currentModality, setCurrentModality] = useState(match?.match_type || tournament?.match_type || 'f7');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const homeTeam = tournament?.standings?.find(s => s.id === match?.home_team_id) || { name: 'Equipo Local', id: match?.home_team_id };
   const awayTeam = tournament?.standings?.find(s => s.id === match?.away_team_id) || { name: 'Equipo Visitante', id: match?.away_team_id };
   const location = locations.find(l => l.id === match?.location_id);
@@ -36,12 +41,12 @@ export default function MatchView() {
   const awayStyle = useMemo(() => getMatteTeamStyle(awayTeam?.name || 'Visitante'), [awayTeam?.name]);
 
   const homeLineup = useMemo(() => {
-    return match && homeTeam ? getMatchLineup(match, homeTeam, true) : null;
-  }, [match, homeTeam]);
+    return match && homeTeam ? getMatchLineup(match, homeTeam, true, currentModality) : null;
+  }, [match, homeTeam, currentModality]);
 
   const awayLineup = useMemo(() => {
-    return match && awayTeam ? getMatchLineup(match, awayTeam, false) : null;
-  }, [match, awayTeam]);
+    return match && awayTeam ? getMatchLineup(match, awayTeam, false, currentModality) : null;
+  }, [match, awayTeam, currentModality]);
 
   if (!match) {
     return (
@@ -69,6 +74,17 @@ export default function MatchView() {
     }
   };
 
+  const handleSaveLineups = async ({ modality, lineups }) => {
+    setCurrentModality(modality);
+    if (updateMatchLineups) {
+      await updateMatchLineups(match.id, {
+        match_type: modality,
+        lineups
+      });
+    }
+    setIsEditModalOpen(false);
+  };
+
   // Recuento de tarjetas en el partido
   const allCards = [
     ...(homeLineup?.starting || []).map(p => ({ ...p, team: homeTeam.name, teamType: 'home' })),
@@ -87,37 +103,41 @@ export default function MatchView() {
           className="btn btn-glass"
           style={{ padding: '0.45rem 0.9rem', gap: '0.4rem', fontSize: '0.82rem' }}
         >
-          <ArrowLeft size={16} /> Volver
+          <ArrowLeft size={16} />
+          <span>Volver</span>
         </button>
 
         <div className="lineups-meta-chips">
           {tournament?.name && (
             <span className="meta-chip">
-              <Trophy size={13} color="var(--gold-light)" /> {tournament.name}
+              <Trophy size={13} color="var(--primary)" /> {tournament.name}
             </span>
           )}
           {match.round && (
             <span className="meta-chip meta-chip-round">
-              {match.round === 'final' ? 'Gran Final' : match.round === 'semifinal' ? 'Semifinal' : match.round === 'quarterfinal' ? 'Cuartos' : match.round}
+              Jornada {match.round}
             </span>
           )}
+          <span className="meta-chip" style={{ background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary-light)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+            <Shield size={13} /> {MODALITIES[currentModality]?.label || 'Fútbol 7'}
+          </span>
         </div>
 
         <button 
           type="button" 
           onClick={handleShare} 
           className="btn btn-glass"
-          style={{ padding: '0.45rem 0.85rem' }}
-          title="Compartir alineaciones"
+          style={{ padding: '0.45rem 0.9rem', gap: '0.4rem', fontSize: '0.82rem' }}
         >
-          <Share2 size={16} color="var(--teal-light)" />
+          <Share2 size={16} />
+          <span>Compartir</span>
         </button>
       </div>
 
-      {/* ── Marcador / Header del Encuentro ── */}
+      {/* ── Marcador / Cabecera Principal ── */}
       <div className="lineups-scoreboard-card glass-panel">
         <div className="scoreboard-layout">
-          {/* Equipo Local */}
+          {/* Local */}
           <div className="scoreboard-team-box home-box">
             <div 
               className="scoreboard-team-avatar"
@@ -125,7 +145,7 @@ export default function MatchView() {
             >
               {homeTeam.name?.slice(0, 2).toUpperCase() || 'L'}
             </div>
-            <div className="scoreboard-team-info home-info">
+            <div className="scoreboard-team-meta">
               <h3 className="scoreboard-team-name">{homeTeam.name}</h3>
               {homeLineup?.formation && (
                 <span className="formation-badge" style={{ borderColor: homeStyle.border, color: homeStyle.color }}>
@@ -135,32 +155,25 @@ export default function MatchView() {
             </div>
           </div>
 
-          {/* Resultado o Horario */}
+          {/* Marcador Central */}
           <div className="scoreboard-center-box">
             {isPlayed ? (
-              <div className="scoreboard-score-wrap">
-                <span className="scoreboard-score-val">{match.home_score}</span>
-                <span className="scoreboard-score-sep">-</span>
-                <span className="scoreboard-score-val">{match.away_score}</span>
+              <div className="score-display">
+                <span className="score-num">{match.home_score ?? 0}</span>
+                <span className="score-divider">:</span>
+                <span className="score-num">{match.away_score ?? 0}</span>
               </div>
             ) : (
-              <div className="scoreboard-vs-badge">VS</div>
+              <div className="score-vs-badge">VS</div>
             )}
-
-            {match.home_penalties != null && match.away_penalties != null && (
-              <span className="scoreboard-pens-val">
-                ({match.home_penalties} - {match.away_penalties} pen.)
-              </span>
-            )}
-
-            <span className={`scoreboard-status-chip ${isPlayed ? 'status-played' : 'status-scheduled'}`}>
-              {isPlayed ? 'FINALIZADO' : 'PROGRAMADO'}
+            <span className={`match-status-pill ${isPlayed ? 'status-finished' : 'status-scheduled'}`}>
+              {isPlayed ? 'Finalizado' : 'Programado'}
             </span>
           </div>
 
-          {/* Equipo Visitante */}
+          {/* Visitante */}
           <div className="scoreboard-team-box away-box">
-            <div className="scoreboard-team-info away-info">
+            <div className="scoreboard-team-meta away-meta">
               <h3 className="scoreboard-team-name">{awayTeam.name}</h3>
               {awayLineup?.formation && (
                 <span className="formation-badge" style={{ borderColor: awayStyle.border, color: awayStyle.color }}>
@@ -223,6 +236,46 @@ export default function MatchView() {
         </div>
       )}
 
+      {/* ── Barra de Modalidad & Botón Editar Alineaciones (Solo Admin) ── */}
+      {isAdmin && (
+        <div className="lineup-control-bar glass-panel">
+          <div className="modality-switch-wrap">
+            <span className="control-bar-label">
+              <Shield size={15} color="var(--primary)" /> Formato:
+            </span>
+            <div className="modality-btn-group">
+              {Object.keys(MODALITIES).map(mKey => (
+                <button
+                  key={mKey}
+                  type="button"
+                  className={`modality-pill-btn ${currentModality === mKey ? 'active' : ''}`}
+                  onClick={() => {
+                    setCurrentModality(mKey);
+                    if (updateMatchLineups) {
+                      updateMatchLineups(match.id, {
+                        match_type: mKey,
+                        lineups: match.lineups ? (typeof match.lineups === 'string' ? JSON.parse(match.lineups) : match.lineups) : null
+                      });
+                    }
+                  }}
+                >
+                  {MODALITIES[mKey].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary edit-lineups-trigger-btn"
+            onClick={() => setIsEditModalOpen(true)}
+          >
+            <Edit3 size={15} />
+            <span>Editar Alineaciones</span>
+          </button>
+        </div>
+      )}
+
       {/* ── Selector de Vista Táctica de Cancha ── */}
       <div className="pitch-view-tabs">
         <button
@@ -276,6 +329,7 @@ export default function MatchView() {
           activeView={activePitchView}
           homeColor={homeStyle}
           awayColor={awayStyle}
+          modality={currentModality}
         />
       </div>
 
@@ -288,7 +342,7 @@ export default function MatchView() {
               className={`roster-tab-btn ${activeRosterTab === 'starters' ? 'active' : ''}`}
               onClick={() => setActiveRosterTab('starters')}
             >
-              Titulares (11)
+              Titulares ({currentModality === 'f5' ? '5' : currentModality === 'f7' ? '7' : '11'})
             </button>
             <button
               type="button"
@@ -504,6 +558,19 @@ export default function MatchView() {
         )}
       </div>
 
+      {/* ── Modal de Edición de Alineaciones ── */}
+      <EditLineupModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        match={match}
+        homeTeam={homeTeam}
+        awayTeam={awayTeam}
+        currentHomeLineup={homeLineup}
+        currentAwayLineup={awayLineup}
+        currentModality={currentModality}
+        onSave={handleSaveLineups}
+      />
+
       {/* ── Estilos de la página de Alineaciones ── */}
       <style>{`
         .match-lineups-page {
@@ -513,6 +580,78 @@ export default function MatchView() {
           display: flex;
           flex-direction: column;
           gap: 1.25rem;
+        }
+
+        .lineup-control-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          padding: 0.75rem 1.25rem;
+          border-radius: var(--radius-xl);
+          flex-wrap: wrap;
+        }
+
+        .modality-switch-wrap {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+
+        .control-bar-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.84rem;
+          font-weight: 800;
+          color: var(--text-secondary);
+        }
+
+        .modality-btn-group {
+          display: inline-flex;
+          background: rgba(0, 0, 0, 0.25);
+          border: 1px solid var(--nm-border);
+          padding: 3px;
+          border-radius: var(--radius-full);
+          gap: 3px;
+        }
+
+        .modality-pill-btn {
+          border: none;
+          background: transparent;
+          color: var(--text-muted);
+          font-size: 0.78rem;
+          font-weight: 800;
+          padding: 0.35rem 0.85rem;
+          border-radius: var(--radius-full);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .modality-pill-btn:hover {
+          color: var(--text-primary);
+        }
+
+        .modality-pill-btn.active {
+          background: var(--primary);
+          color: #ffffff;
+          box-shadow: 0 2px 10px rgba(79, 109, 245, 0.4);
+        }
+
+        .edit-lineups-trigger-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.84rem;
+          font-weight: 800;
+          padding: 0.5rem 1.1rem;
+          border-radius: var(--radius-lg);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .edit-lineups-trigger-btn:hover {
+          transform: translateY(-1px);
         }
 
         .lineups-top-bar {

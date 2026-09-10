@@ -1,18 +1,20 @@
 import { useState } from 'react';
-import { Trophy, Shield, Calendar as CalendarIcon, ArrowLeft, Edit2, Trash2, Plus, X, Check } from 'lucide-react';
+import { Trophy, Shield, Calendar as CalendarIcon, ArrowLeft, Edit2, Trash2, Plus, X, Check, Users, Sliders } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal, ConfirmDialog, SectionHeader, EmptyState, StatBadge } from './AdminModal';
 import { ScoreInput, PenaltyInput } from './ScoreInput';
 import CustomDatePicker from '../CustomDatePicker';
 import CustomTimePicker from '../CustomTimePicker';
 import CustomSelect from '../CustomSelect';
+import EditLineupModal from '../lineup/EditLineupModal';
+import { MODALITIES } from '../../utils/lineupUtils';
 
 export default function TournamentsTab({ setViewingState }) {
   const {
     tournaments, addTournament, editTournament, deleteTournament,
     addTeam, deleteTeam, updateTeamStats,
     matches, addMatch, editMatch, deleteMatch, generateBracket,
-    locations
+    locations, updateMatchLineups
   } = useAppContext();
 
   // Navigation within tab
@@ -22,12 +24,14 @@ export default function TournamentsTab({ setViewingState }) {
   // Modals & confirms
   const [openModal, setOpenModal] = useState(null); // 'tournament' | 'team' | 'match'
   const [confirmAction, setConfirmAction] = useState(null);
+  const [lineupEditingMatch, setLineupEditingMatch] = useState(null);
   const askConfirm = (title, message, onConfirm) => setConfirmAction({ title, message, onConfirm });
 
   // Forms: Tournament
   const [newTournamentName, setNewTournamentName] = useState('');
   const [newTournamentType, setNewTournamentType] = useState('league');
   const [newTournamentImage, setNewTournamentImage] = useState('');
+  const [newTournamentMatchType, setNewTournamentMatchType] = useState('f7');
   const [editingTournamentId, setEditingTournamentId] = useState(null);
   const [editTournamentData, setEditTournamentData] = useState({});
 
@@ -65,10 +69,16 @@ export default function TournamentsTab({ setViewingState }) {
   const handleAddTournament = (e) => {
     e.preventDefault();
     if (newTournamentName.trim()) {
-      addTournament({ name: newTournamentName.trim(), type: newTournamentType, image: newTournamentImage.trim() });
+      addTournament({ 
+        name: newTournamentName.trim(), 
+        type: newTournamentType, 
+        image: newTournamentImage.trim(),
+        match_type: newTournamentMatchType || 'f7'
+      });
       setNewTournamentName('');
       setNewTournamentType('league');
       setNewTournamentImage('');
+      setNewTournamentMatchType('f7');
       setOpenModal(null);
     }
   };
@@ -117,6 +127,7 @@ export default function TournamentsTab({ setViewingState }) {
         ...newMatch,
         match_order: matchOrder,
         tournament_id: viewingTournamentId,
+        match_type: newMatch.match_type || currentTournament?.match_type || 'f7',
         home_score: newMatch.status === 'played' ? (parseInt(newMatch.home_score) || 0) : 0,
         away_score: newMatch.status === 'played' ? (parseInt(newMatch.away_score) || 0) : 0,
         home_penalties: (newMatch.status === 'played' && newMatch.has_penalties)
@@ -135,6 +146,7 @@ export default function TournamentsTab({ setViewingState }) {
         time: '12:00', location_id: '', stream_url: '',
         round: '', match_order: 0, description: '',
         status: 'scheduled',
+        match_type: currentTournament?.match_type || 'f7',
         home_score: 0,
         away_score: 0,
         has_penalties: false,
@@ -391,16 +403,40 @@ export default function TournamentsTab({ setViewingState }) {
                             </div>
                           </div>
 
-                          <div className="form-group" style={{ margin: 0 }}>
-                            <label className="form-label" style={{ fontSize: '0.72rem' }}>URL del Video / Transmisión</label>
-                            <input
-                              type="url"
-                              className="form-input"
-                              placeholder="https://www.youtube.com/watch?v=..."
-                              value={editMatchData.stream_url || ''}
-                              onChange={e => setEditMatchData({ ...editMatchData, stream_url: e.target.value })}
-                            />
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.72rem' }}>URL Video / Transmisión</label>
+                              <input
+                                type="url"
+                                className="form-input"
+                                placeholder="https://www.youtube.com/watch?v=..."
+                                value={editMatchData.stream_url || ''}
+                                onChange={e => setEditMatchData({ ...editMatchData, stream_url: e.target.value })}
+                              />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.72rem' }}>Modalidad de Fútbol</label>
+                              <CustomSelect
+                                value={editMatchData.match_type || currentTournament?.match_type || 'f7'}
+                                onChange={val => setEditMatchData({ ...editMatchData, match_type: val })}
+                                options={Object.values(MODALITIES).map(m => ({
+                                  value: m.key,
+                                  label: `${m.label} (${m.players} vs ${m.players})`
+                                }))}
+                                placeholder="Modalidad de fútbol"
+                              />
+                            </div>
                           </div>
+
+                          <button
+                            type="button"
+                            className="btn btn-glass"
+                            style={{ width: '100%', fontSize: '0.8rem', gap: '0.45rem', justifyContent: 'center', padding: '0.55rem' }}
+                            onClick={() => setLineupEditingMatch(match)}
+                          >
+                            <Users size={15} color="var(--primary-light)" />
+                            <span>Configurar Alineaciones del Encuentro</span>
+                          </button>
 
                           <div style={{ background: 'var(--bg-dark)', borderRadius: 'var(--radius-md)', padding: '1.25rem', border: '1px solid var(--border-glass)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -458,9 +494,12 @@ export default function TournamentsTab({ setViewingState }) {
                       ) : (
                         <div style={{ padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{match.date} {match.time}</span>
                               {match.round && <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.08)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{match.round}</span>}
+                              <span style={{ fontSize: '0.65rem', background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary-light)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                {MODALITIES[match.match_type || currentTournament?.match_type || 'f7']?.tag || 'F7'}
+                              </span>
                             </div>
                             <p style={{ margin: 0, fontWeight: '700', fontSize: '0.92rem' }}>
                               {homeTeam?.name || 'Por definir'} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>vs</span> {awayTeam?.name || 'Por definir'}
@@ -472,10 +511,19 @@ export default function TournamentsTab({ setViewingState }) {
                               </p>
                             )}
                           </div>
-                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                            <button
+                              className="btn btn-glass"
+                              style={{ padding: '0.45rem 0.75rem', fontSize: '0.78rem', gap: '0.35rem', display: 'inline-flex', alignItems: 'center' }}
+                              onClick={() => setLineupEditingMatch(match)}
+                              title="Editar Alineaciones del Partido"
+                            >
+                              <Users size={14} color="var(--primary-light)" />
+                              <span>Alineaciones</span>
+                            </button>
                             <button className="btn btn-glass" style={{ padding: '0.6rem' }} onClick={() => {
                               setEditingMatchId(match.id);
-                              setEditMatchData({ ...match });
+                              setEditMatchData({ ...match, match_type: match.match_type || currentTournament?.match_type || 'f7' });
                             }}>
                               <Edit2 size={15} />
                             </button>
@@ -528,6 +576,33 @@ export default function TournamentsTab({ setViewingState }) {
                       onChange={e => setEditTournamentData({ ...editTournamentData, image: e.target.value })}
                       placeholder="URL de Portada (Opcional)"
                     />
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>Formato:</span>
+                      <div style={{ display: 'flex', gap: '0.35rem', flex: 1 }}>
+                        {Object.values(MODALITIES).map(m => {
+                          const isSel = (editTournamentData.match_type || tournament.match_type || 'f7') === m.key;
+                          return (
+                            <button
+                              key={m.key}
+                              type="button"
+                              className="btn"
+                              onClick={() => setEditTournamentData({ ...editTournamentData, match_type: m.key })}
+                              style={{
+                                flex: 1,
+                                padding: '0.35rem 0.5rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                background: isSel ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                borderColor: isSel ? 'var(--primary)' : 'var(--border-glass)',
+                                color: isSel ? 'var(--primary-light)' : 'var(--text-secondary)'
+                              }}
+                            >
+                              {m.tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => handleUpdateTournament(tournament.id)}>
                         <Check size={16} /> Guardar
@@ -546,8 +621,16 @@ export default function TournamentsTab({ setViewingState }) {
                       <p style={{ fontWeight: '700', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
                         {tournament.name}
                       </p>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: tournament.type === 'knockout' ? '#f87171' : '#34d399', fontWeight: '600' }}>
-                        {tournament.type === 'knockout' ? 'Eliminatoria' : 'Liga'} · {tournament.standings?.length || 0} equipos
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <span style={{ color: 'var(--primary-light)', fontWeight: 800 }}>
+                          {MODALITIES[tournament.match_type || 'f7']?.label || 'Fútbol 7'}
+                        </span>
+                        <span>·</span>
+                        <span style={{ color: tournament.type === 'knockout' ? '#f87171' : '#34d399' }}>
+                          {tournament.type === 'knockout' ? 'Eliminatoria' : 'Liga'}
+                        </span>
+                        <span>·</span>
+                        <span>{tournament.standings?.length || 0} equipos</span>
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -556,7 +639,7 @@ export default function TournamentsTab({ setViewingState }) {
                       </button>
                       <button className="btn btn-glass" style={{ padding: '0.6rem' }} onClick={() => {
                         setEditingTournamentId(tournament.id);
-                        setEditTournamentData({ ...tournament });
+                        setEditTournamentData({ ...tournament, match_type: tournament.match_type || 'f7' });
                       }}>
                         <Edit2 size={15} />
                       </button>
@@ -607,6 +690,42 @@ export default function TournamentsTab({ setViewingState }) {
                 </label>
               </div>
             </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Modalidad / Formato de Fútbol</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                {Object.values(MODALITIES).map(m => {
+                  const isSel = newTournamentMatchType === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      className="btn"
+                      onClick={() => setNewTournamentMatchType(m.key)}
+                      style={{
+                        padding: '0.65rem 0.5rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        background: isSel ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
+                        borderColor: isSel ? 'var(--primary)' : 'var(--border-glass)',
+                        color: isSel ? 'var(--primary-light)' : 'var(--text-secondary)',
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{m.tag}</span>
+                      <span style={{ fontSize: '0.74rem' }}>{m.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '0.35rem', display: 'block' }}>
+                Todos los partidos que programes en este torneo adoptarán automáticamente este formato.
+              </small>
+            </div>
+
             <button type="submit" className="btn btn-primary">
               <Plus size={17} /> Crear Torneo
             </button>
@@ -706,6 +825,24 @@ export default function TournamentsTab({ setViewingState }) {
               />
             </div>
 
+            <div className="form-group" style={{ margin: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>Modalidad / Formato</label>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  (Predefinido por torneo: {MODALITIES[currentTournament?.match_type || 'f7']?.tag})
+                </span>
+              </div>
+              <CustomSelect
+                value={newMatch.match_type || currentTournament?.match_type || 'f7'}
+                onChange={val => setNewMatch({ ...newMatch, match_type: val })}
+                options={Object.values(MODALITIES).map(m => ({
+                  value: m.key,
+                  label: `${m.label} (${m.players} vs ${m.players})`
+                }))}
+                placeholder="Modalidad de fútbol"
+              />
+            </div>
+
             {/* Marcador y penales si el partido se añade como Finalizado */}
             {newMatch.status === 'played' && (
               <div style={{ background: 'var(--bg-dark)', borderRadius: 'var(--radius-md)', padding: '1rem 1.25rem', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -782,6 +919,27 @@ export default function TournamentsTab({ setViewingState }) {
           message={confirmAction.message}
           onConfirm={confirmAction.onConfirm}
           onCancel={() => setConfirmAction(null)}
+        />
+      )}
+
+      {/* Modal de Alineaciones de Partido */}
+      {lineupEditingMatch && (
+        <EditLineupModal
+          isOpen={!!lineupEditingMatch}
+          onClose={() => setLineupEditingMatch(null)}
+          match={lineupEditingMatch}
+          homeTeam={currentTournament?.standings?.find(s => s.id === lineupEditingMatch.home_team_id) || { name: 'Equipo Local', id: lineupEditingMatch.home_team_id }}
+          awayTeam={currentTournament?.standings?.find(s => s.id === lineupEditingMatch.away_team_id) || { name: 'Equipo Visitante', id: lineupEditingMatch.away_team_id }}
+          currentModality={lineupEditingMatch.match_type || currentTournament?.match_type || 'f7'}
+          onSave={async ({ modality, lineups }) => {
+            if (updateMatchLineups) {
+              await updateMatchLineups(lineupEditingMatch.id, {
+                match_type: modality,
+                lineups
+              });
+            }
+            setLineupEditingMatch(null);
+          }}
         />
       )}
     </section>

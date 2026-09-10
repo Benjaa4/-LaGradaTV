@@ -91,10 +91,11 @@ async function initDb() {
       await db.execute(`ALTER TABLE tournaments ADD COLUMN type TEXT DEFAULT 'league'`);
     } catch (e) { /* column already exists */ }
 
-    // Add season, description, image columns to tournaments
+    // Add season, description, image, match_type columns to tournaments
     try { await db.execute(`ALTER TABLE tournaments ADD COLUMN season TEXT`); } catch (e) {}
     try { await db.execute(`ALTER TABLE tournaments ADD COLUMN description TEXT`); } catch (e) {}
     try { await db.execute(`ALTER TABLE tournaments ADD COLUMN image TEXT`); } catch (e) {}
+    try { await db.execute(`ALTER TABLE tournaments ADD COLUMN match_type TEXT DEFAULT 'f7'`); } catch (e) {}
 
     // Add round and match_order to matches (for knockout brackets)
     try {
@@ -125,6 +126,14 @@ async function initDb() {
     // Add description to matches
     try {
       await db.execute(`ALTER TABLE matches ADD COLUMN description TEXT`);
+    } catch (e) { /* column already exists */ }
+
+    // Add match_type (f5, f7, f11) and lineups to matches
+    try {
+      await db.execute(`ALTER TABLE matches ADD COLUMN match_type TEXT DEFAULT 'f7'`);
+    } catch (e) { /* column already exists */ }
+    try {
+      await db.execute(`ALTER TABLE matches ADD COLUMN lineups TEXT`);
     } catch (e) { /* column already exists */ }
 
 

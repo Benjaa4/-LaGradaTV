@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, Trophy, MapPin, Edit2, Trash2, X, Check, Video } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Trophy, MapPin, Edit2, Trash2, X, Check, Video, Users } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { SectionHeader, EmptyState, ConfirmDialog } from './AdminModal';
 import { ScoreInput, PenaltyInput } from './ScoreInput';
 import CustomDatePicker from '../CustomDatePicker';
 import CustomTimePicker from '../CustomTimePicker';
 import CustomSelect from '../CustomSelect';
+import EditLineupModal from '../lineup/EditLineupModal';
+import { MODALITIES } from '../../utils/lineupUtils';
 
 export default function AgendaTab() {
-  const { matches, tournaments, locations, editMatch, deleteMatch } = useAppContext();
+  const { matches, tournaments, locations, editMatch, deleteMatch, updateMatchLineups } = useAppContext();
   const [editingMatchId, setEditingMatchId] = useState(null);
   const [editMatchData, setEditMatchData] = useState({});
   const [confirmAction, setConfirmAction] = useState(null);
+  const [lineupEditingMatch, setLineupEditingMatch] = useState(null);
   const [filterTournamentId, setFilterTournamentId] = useState('all');
 
   const askConfirm = (title, message, onConfirm) => setConfirmAction({ title, message, onConfirm });
@@ -209,7 +212,16 @@ export default function AgendaTab() {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.35rem', marginLeft: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', marginLeft: '1rem', alignItems: 'center' }}>
+                      <button
+                        className="btn btn-glass"
+                        style={{ padding: '0.45rem 0.65rem', fontSize: '0.76rem', gap: '0.35rem', display: 'inline-flex', alignItems: 'center' }}
+                        onClick={() => setLineupEditingMatch(match)}
+                        title="Editar Alineaciones del Partido"
+                      >
+                        <Users size={13} color="var(--primary-light)" />
+                        <span>Alineaciones</span>
+                      </button>
                       <button className="btn btn-glass" style={{ padding: '0.5rem' }} onClick={() => {
                         setEditingMatchId(match.id);
                         setEditMatchData({ ...match });
@@ -250,6 +262,27 @@ export default function AgendaTab() {
           message={confirmAction.message}
           onConfirm={confirmAction.onConfirm}
           onCancel={() => setConfirmAction(null)}
+        />
+      )}
+
+      {/* Modal de Alineaciones de Partido */}
+      {lineupEditingMatch && (
+        <EditLineupModal
+          isOpen={!!lineupEditingMatch}
+          onClose={() => setLineupEditingMatch(null)}
+          match={lineupEditingMatch}
+          homeTeam={tournaments.find(t => t.id === lineupEditingMatch.tournament_id)?.standings?.find(s => s.id === lineupEditingMatch.home_team_id) || { name: 'Equipo Local', id: lineupEditingMatch.home_team_id }}
+          awayTeam={tournaments.find(t => t.id === lineupEditingMatch.tournament_id)?.standings?.find(s => s.id === lineupEditingMatch.away_team_id) || { name: 'Equipo Visitante', id: lineupEditingMatch.away_team_id }}
+          currentModality={lineupEditingMatch.match_type || tournaments.find(t => t.id === lineupEditingMatch.tournament_id)?.match_type || 'f7'}
+          onSave={async ({ modality, lineups }) => {
+            if (updateMatchLineups) {
+              await updateMatchLineups(lineupEditingMatch.id, {
+                match_type: modality,
+                lineups
+              });
+            }
+            setLineupEditingMatch(null);
+          }}
         />
       )}
     </section>

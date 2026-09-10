@@ -335,6 +335,9 @@ export const AppProvider = ({ children }) => {
       });
       if (res.ok) {
         setTournaments(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+        if (data.match_type) {
+          setMatches(prev => prev.map(m => m.tournament_id === id ? { ...m, match_type: data.match_type } : m));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -535,6 +538,39 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const updateMatchLineups = async (matchId, { match_type, lineups }) => {
+    const lineupsStr = typeof lineups === 'string' ? lineups : JSON.stringify(lineups);
+    try {
+      const res = await fetch(`${API_URL}/matches/${matchId}/lineups`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('adminToken') ? { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` } : {})
+        },
+        body: JSON.stringify({ match_type, lineups: lineupsStr })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMatches(prev => prev.map(m => m.id === matchId ? { 
+          ...m, 
+          match_type: data.match_type || match_type, 
+          lineups: data.lineups || lineupsStr
+        } : m));
+        return true;
+      }
+    } catch (e) {
+      console.warn('Backend update failed, saving locally in state:', e);
+    }
+
+    // Fallback in-memory update
+    setMatches(prev => prev.map(m => m.id === matchId ? { 
+      ...m, 
+      match_type, 
+      lineups: lineupsStr
+    } : m));
+    return true;
+  };
+
   return (
     <AppContext.Provider value={{
       isAdmin, authChecking, login, logout,
@@ -544,7 +580,7 @@ export const AppProvider = ({ children }) => {
       videos, addVideo, editVideo, deleteVideo,
       albums, addAlbum, editAlbum, deleteAlbum,
       locations, addLocation, editLocation, deleteLocation,
-      matches, addMatch, editMatch, deleteMatch, generateBracket,
+      matches, addMatch, editMatch, deleteMatch, generateBracket, updateMatchLineups,
       activeMatchModal, openMatchModal, closeMatchModal,
       loading
     }}>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Video } from 'lucide-react';
+import { Play, Video, Tv } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './VideoPlayer.css';
 

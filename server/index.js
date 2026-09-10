@@ -65,15 +65,16 @@ app.get('/api/auth/verify', requireAdmin, (req, res) => {
 
 // Add a new tournament (Admin only)
 app.post('/api/tournaments', requireAdmin, async (req, res) => {
-  const { name, type, season, description, image } = req.body;
+  const { name, type, season, description, image, match_type } = req.body;
   const id = generateId('t');
+  const modality = match_type || 'f7';
 
   try {
     await db.execute({
-      sql: 'INSERT INTO tournaments (id, name, type, season, description, image) VALUES (?, ?, ?, ?, ?, ?)',
-      args: [id, name, type || 'league', season || null, description || null, image || null]
+      sql: 'INSERT INTO tournaments (id, name, type, season, description, image, match_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [id, name, type || 'league', season || null, description || null, image || null, modality]
     });
-    res.status(201).json({ id, name, type: type || 'league', season: season || null, description: description || null, image: image || null, standings: [] });
+    res.status(201).json({ id, name, type: type || 'league', season: season || null, description: description || null, image: image || null, match_type: modality, standings: [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -81,15 +82,25 @@ app.post('/api/tournaments', requireAdmin, async (req, res) => {
 
 // Edit a tournament (Admin only)
 app.put('/api/tournaments/:id', requireAdmin, async (req, res) => {
-  const { name, type, season, description, image } = req.body;
+  const { name, type, season, description, image, match_type } = req.body;
+  const modality = match_type || 'f7';
 
   try {
     const result = await db.execute({
-      sql: 'UPDATE tournaments SET name = ?, type = ?, season = ?, description = ?, image = ? WHERE id = ?',
-      args: [name, type || 'league', season || null, description || null, image || null, req.params.id]
+      sql: 'UPDATE tournaments SET name = ?, type = ?, season = ?, description = ?, image = ?, match_type = ? WHERE id = ?',
+      args: [name, type || 'league', season || null, description || null, image || null, modality, req.params.id]
     });
     if (result.rowsAffected === 0) return res.status(404).json({ error: 'Tournament not found' });
-    res.json({ message: 'Tournament updated successfully', id: req.params.id, name, type: type || 'league', season, description, image });
+
+    // Asignar automáticamente la modalidad del torneo a todos los partidos del mismo
+    if (match_type) {
+      await db.execute({
+        sql: 'UPDATE matches SET match_type = ? WHERE tournament_id = ?',
+        args: [modality, req.params.id]
+      });
+    }
+
+    res.json({ message: 'Tournament updated successfully', id: req.params.id, name, type: type || 'league', season, description, image, match_type: modality });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -406,14 +417,24 @@ app.get('/api/matches', async (req, res) => {
 
 // Add a match (Admin only)
 app.post('/api/matches', requireAdmin, async (req, res) => {
-  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description } = req.body;
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description, match_type, lineups } = req.body;
   const id = generateId('m');
+  let mType = match_type;
+  if (!mType && tournament_id) {
+    try {
+      const tRes = await db.execute({ sql: 'SELECT match_type FROM tournaments WHERE id = ?', args: [tournament_id] });
+      if (tRes.rows.length > 0 && tRes.rows[0].match_type) {
+        mType = tRes.rows[0].match_type;
+      }
+    } catch (e) {}
+  }
+  mType = mType || 'f7';
   try {
     await db.execute({
-      sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      args: [id, tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, description || null]
+      sql: 'INSERT INTO matches (id, tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description, match_type, lineups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      args: [id, tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, description || null, mType, lineupsStr]
     });
-    res.status(201).json({ id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null, description: description || null });
+    res.status(201).json({ id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null, description: description || null, match_type: mType, lineups: lineupsStr });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -421,14 +442,32 @@ app.post('/api/matches', requireAdmin, async (req, res) => {
 
 // Edit a match (Admin only)
 app.put('/api/matches/:id', requireAdmin, async (req, res) => {
-  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description } = req.body;
+  const { tournament_id, home_team_id, away_team_id, date, time, location_id, status, home_score, away_score, stream_url, round, match_order, home_penalties, away_penalties, description, match_type, lineups } = req.body;
+  const lineupsStr = lineups !== undefined ? (typeof lineups === 'string' ? lineups : JSON.stringify(lineups)) : null;
+  const mType = match_type || 'f7';
   try {
     const result = await db.execute({
-      sql: 'UPDATE matches SET tournament_id = ?, home_team_id = ?, away_team_id = ?, date = ?, time = ?, location_id = ?, status = ?, home_score = ?, away_score = ?, stream_url = ?, round = ?, match_order = ?, home_penalties = ?, away_penalties = ?, description = ? WHERE id = ?',
-      args: [tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, description || null, req.params.id]
+      sql: 'UPDATE matches SET tournament_id = ?, home_team_id = ?, away_team_id = ?, date = ?, time = ?, location_id = ?, status = ?, home_score = ?, away_score = ?, stream_url = ?, round = ?, match_order = ?, home_penalties = ?, away_penalties = ?, description = ?, match_type = COALESCE(?, match_type), lineups = COALESCE(?, lineups) WHERE id = ?',
+      args: [tournament_id, home_team_id, away_team_id, date, time, location_id || null, status || 'scheduled', home_score || 0, away_score || 0, stream_url || null, round || null, match_order || 0, home_penalties ?? null, away_penalties ?? null, description || null, mType, lineupsStr, req.params.id]
     });
     if (result.rowsAffected === 0) return res.status(404).json({ error: 'Match not found' });
-    res.json({ message: 'Match updated', id: req.params.id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null, description: description || null });
+    res.json({ message: 'Match updated', id: req.params.id, tournament_id, home_team_id, away_team_id, date, time, location_id: location_id || null, status: status || 'scheduled', home_score: home_score || 0, away_score: away_score || 0, stream_url: stream_url || null, round: round || null, match_order: match_order || 0, home_penalties: home_penalties ?? null, away_penalties: away_penalties ?? null, description: description || null, match_type: mType, lineups: lineupsStr });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update match lineups and modality
+app.put('/api/matches/:id/lineups', async (req, res) => {
+  const { match_type, lineups } = req.body;
+  const lineupsStr = typeof lineups === 'string' ? lineups : JSON.stringify(lineups);
+  try {
+    const result = await db.execute({
+      sql: 'UPDATE matches SET match_type = COALESCE(?, match_type), lineups = ? WHERE id = ?',
+      args: [match_type || 'f7', lineupsStr, req.params.id]
+    });
+    if (result.rowsAffected === 0) return res.status(404).json({ error: 'Match not found' });
+    res.json({ message: 'Lineups updated', id: req.params.id, match_type, lineups: lineupsStr });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

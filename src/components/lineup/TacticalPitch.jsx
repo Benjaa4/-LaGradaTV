@@ -8,6 +8,7 @@ export default function TacticalPitch({
   homeLineup, 
   awayLineup, 
   activeView = 'home', // 'home' | 'away' | 'both'
+  modality = 'f7',     // 'f5' | 'f7' | 'f11'
   homeColor = { bg: 'rgba(79, 109, 245, 0.35)', border: '#4f6df5', color: '#818cf8' },
   awayColor = { bg: 'rgba(225, 95, 65, 0.35)', border: '#e15f41', color: '#f87171' }
 }) {
@@ -31,9 +32,7 @@ export default function TacticalPitch({
       teamName: awayTeam?.name || 'Visitante'
     }));
   } else if (activeView === 'both' && homeLineup && awayLineup) {
-    // Vista completa frente a frente:
-    // Local defiende abajo (y: 50% a 95%)
-    // Visitante defiende arriba (y: 5% a 50%)
+    // Vista completa frente a frente
     const homeAdjusted = homeLineup.starting.map(p => ({
       ...p,
       x: p.x,
@@ -57,8 +56,8 @@ export default function TacticalPitch({
 
   return (
     <div className="tactical-pitch-wrapper">
-      {/* Campo de Juego Táctico */}
-      <div className="soccer-pitch">
+      {/* Campo de Juego Táctico Adaptativo */}
+      <div className={`soccer-pitch pitch-${modality}`}>
         {/* Marcaciones de Cancha en SVG */}
         <svg className="pitch-markings" viewBox="0 0 100 135" preserveAspectRatio="none">
           {/* Borde exterior */}
@@ -68,28 +67,53 @@ export default function TacticalPitch({
           <line x1="4" y1="67.5" x2="96" y2="67.5" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
           
           {/* Círculo central */}
-          <circle cx="50" cy="67.5" r="13" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+          <circle cx="50" cy="67.5" r={modality === 'f5' ? 10 : 13} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
           <circle cx="50" cy="67.5" r="1" fill="rgba(255,255,255,0.5)" />
 
-          {/* Área grande Arriba */}
-          <rect x="23" y="4" width="54" height="22" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
-          {/* Área chica Arriba */}
-          <rect x="36" y="4" width="28" height="8" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
-          {/* Punto penal y arco Arriba */}
-          <circle cx="50" cy="18" r="0.9" fill="rgba(255,255,255,0.6)" />
-          <path d="M 39 26 A 11 11 0 0 0 61 26" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
-          {/* Portería Arriba */}
-          <rect x="42" y="1.2" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+          {/* Marcaciones específicas según F5, F7, F11 */}
+          {modality === 'f5' ? (
+            <>
+              {/* Área F5 Arriba (Semicírculo 6m / Futsal D-box) */}
+              <path d="M 28 4 A 22 17 0 0 0 72 4" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="0.8" />
+              <circle cx="50" cy="18" r="0.9" fill="rgba(255,255,255,0.6)" />
+              <rect x="42" y="1.2" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
 
-          {/* Área grande Abajo */}
-          <rect x="23" y="109" width="54" height="22" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
-          {/* Área chica Abajo */}
-          <rect x="36" y="123" width="28" height="8" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
-          {/* Punto penal y arco Abajo */}
-          <circle cx="50" cy="117" r="0.9" fill="rgba(255,255,255,0.6)" />
-          <path d="M 39 109 A 11 11 0 0 1 61 109" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
-          {/* Portería Abajo */}
-          <rect x="42" y="131" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+              {/* Área F5 Abajo */}
+              <path d="M 28 131 A 22 17 0 0 1 72 131" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="0.8" />
+              <circle cx="50" cy="117" r="0.9" fill="rgba(255,255,255,0.6)" />
+              <rect x="42" y="131" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+            </>
+          ) : modality === 'f7' ? (
+            <>
+              {/* Área F7 Arriba */}
+              <rect x="24" y="4" width="52" height="19" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <circle cx="50" cy="17" r="0.9" fill="rgba(255,255,255,0.6)" />
+              <path d="M 40 23 A 10 10 0 0 0 60 23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <rect x="42" y="1.2" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+
+              {/* Área F7 Abajo */}
+              <rect x="24" y="112" width="52" height="19" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <circle cx="50" cy="118" r="0.9" fill="rgba(255,255,255,0.6)" />
+              <path d="M 40 112 A 10 10 0 0 1 60 112" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <rect x="42" y="131" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+            </>
+          ) : (
+            <>
+              {/* Área F11 Arriba */}
+              <rect x="23" y="4" width="54" height="22" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <rect x="36" y="4" width="28" height="8" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <circle cx="50" cy="18" r="0.9" fill="rgba(255,255,255,0.6)" />
+              <path d="M 39 26 A 11 11 0 0 0 61 26" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <rect x="42" y="1.2" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+
+              {/* Área F11 Abajo */}
+              <rect x="23" y="109" width="54" height="22" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <rect x="36" y="123" width="28" height="8" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <circle cx="50" cy="117" r="0.9" fill="rgba(255,255,255,0.6)" />
+              <path d="M 39 109 A 11 11 0 0 1 61 109" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+              <rect x="42" y="131" width="16" height="2.8" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+            </>
+          )}
 
           {/* Córners */}
           <path d="M 4 7 A 3 3 0 0 0 7 4" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { MapPin, Calendar, Clock, Trophy, X, ExternalLink, Video, Share2, Star, Check, FileText, Users } from 'lucide-react';
+import { MapPin, Calendar, Clock, Trophy, X, ExternalLink, Video, Share2, Star, Check, FileText, Users, Play } from 'lucide-react';
 import { parseVideoUrl } from '../utils/videoUtils';
 import './MatchDetailSheet.css';
 
@@ -314,15 +314,14 @@ export default function MatchDetailSheet() {
                   </div>
                 </div>
 
-                <a 
-                  href={match.stream_url} 
-                  target="_blank" 
-                  rel="noreferrer" 
+                <Link 
+                  to={`/video/match-${match.id}`}
+                  onClick={closeMatchModal}
                   className="btn btn-primary btn-sm"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', padding: '0.5rem 1rem', fontWeight: 800 }}
                 >
-                  <ExternalLink size={14} /> Abrir Video
-                </a>
+                  <Play size={14} fill="currentColor" /> Ver Video
+                </Link>
               </div>
             </div>
           )}
